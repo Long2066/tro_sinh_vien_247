@@ -1054,3 +1054,101 @@ select:focus, input:focus, textarea:focus {
     background: var(--color-primary-hover);
 }
 
+/* ==========================================
+   12. MOBILE & iOS PLATFORM OPTIMIZATIONS (ANDROID & iOS)
+   ========================================== */
+
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 768px) {
+    /* Ngăn iOS Safari tự động phóng to (Auto-zoom) khi nhấp vào ô input */
+    input[type="text"],
+    input[type="number"],
+    input[type="search"],
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+    
+    /* Tối ưu hóa Touch Targets trên Mobile */
+    .btn, 
+    .tab-btn, 
+    .filter-btn,
+    .roommate-phone-btn,
+    .mobile-toggle .btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 16px;
+    }
+
+    /* Bố cục bộ lọc tìm kiếm di động */
+    .search-filter-section {
+        padding: 12px;
+        gap: 10px;
+    }
+    
+    .filter-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* Modal dialog */
+    .modal-content {
+        width: 94% !important;
+        max-width: 100% !important;
+        margin: 20px auto;
+        padding: 16px !important;
+        border-radius: 16px !important;
+    }
+    
+    .post-modal-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px;
+    }
+    
+    /* Danh sách bạn ở ghép */
+    .roommates-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Header di động thu nhỏ */
+    header {
+        padding: 10px 12px;
+        height: auto;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .header-actions {
+        width: 100%;
+        justify-content: center;
+        gap: 10px;
+    }
+    
+    .header-actions button,
+    .header-actions a {
+        flex: 1;
+        justify-content: center;
+    }
+    
+    .logo-text {
+        font-size: 18px;
+    }
+
+    /* Điều chỉnh lại layout container do header cao hơn */
+    .app-container {
+        height: calc(100vh - 90px);
+    }
+    
+    .sidebar {
+        height: 55% !important;
+    }
+}
+
+
