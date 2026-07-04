@@ -1,0 +1,82 @@
+[
+  {
+    "id": "rm-1",
+    "name": "Nguyễn Minh Đức",
+    "gender": "Nam",
+    "contactPhone": "0987654321",
+    "uniId": "hust",
+    "uniAbbr": "HUST",
+    "maxBudget": 2000000,
+    "habits": {
+      "cleanliness": 4,
+      "smoking": "no",
+      "sleep": "late",
+      "social": "sometimes"
+    },
+    "description": "Mình là sinh viên năm 3 Bách Khoa, tính tình vui vẻ hòa đồng, gọn gàng ngăn nắp. Muốn tìm bạn nam ở ghép sạch sẽ, không hút thuốc để chia tiền phòng khu Bách Khoa - Giải Phóng."
+  },
+  {
+    "id": "rm-2",
+    "name": "Trần Thị Thu Hà",
+    "gender": "Nữ",
+    "contactPhone": "0912345678",
+    "uniId": "neu",
+    "uniAbbr": "NEU",
+    "maxBudget": 2500000,
+    "habits": {
+      "cleanliness": 5,
+      "smoking": "no",
+      "sleep": "early",
+      "social": "no"
+    },
+    "description": "Sinh viên năm 2 NEU, thích yên tĩnh để học tập, sống rất ngăn nắp và tự giác. Tìm bạn nữ ở chung quanh khu vực Trần Đại Nghĩa - Lê Thanh Nghị."
+  },
+  {
+    "id": "rm-3",
+    "name": "Lê Hoàng Nam",
+    "gender": "Nam",
+    "contactPhone": "0356789123",
+    "uniId": "tnu-hg",
+    "uniAbbr": "TNU-HG",
+    "maxBudget": 1500000,
+    "habits": {
+      "cleanliness": 3,
+      "smoking": "no",
+      "sleep": "late",
+      "social": "sometimes"
+    },
+    "description": "Mình học phân hiệu Hà Giang (Tuyên Quang), đang muốn thuê phòng gần trường tầm 1.2tr - 1.5tr để ở ghép. Sống thoải mái, tự do giờ giấc, không hút thuốc."
+  },
+  {
+    "id": "rm-4",
+    "name": "Phạm Thùy Linh",
+    "gender": "Nữ",
+    "contactPhone": "0888999000",
+    "uniId": "ftu",
+    "uniAbbr": "FTU",
+    "maxBudget": 3000000,
+    "habits": {
+      "cleanliness": 4,
+      "smoking": "no",
+      "sleep": "early",
+      "social": "sometimes"
+    },
+    "description": "Sinh viên Ngoại Thương năng động, hay đi làm thêm nên về muộn chút nhưng giữ yên lặng. Tìm bạn nữ share căn hộ mini Chùa Láng cực đẹp đã có sẵn đồ."
+  },
+  {
+    "id": "rm-1782919274324",
+    "name": "Lê Thị Thảo",
+    "gender": "Nữ",
+    "contactPhone": "0900000000",
+    "uniId": "neu",
+    "uniAbbr": "NEU",
+    "maxBudget": 2200000,
+    "habits": {
+      "cleanliness": 5,
+      "smoking": "no",
+      "sleep": "early",
+      "social": "sometimes"
+    },
+    "description": "Mình rất muốn tìm một bạn nữ ngoan hiền học NEU để ở ghép chung."
+  }
+]

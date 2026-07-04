@@ -1,0 +1,20 @@
+[
+  {
+    "phone": "0968123456",
+    "name": "Lê Văn A (Môi giới lừa đảo phí cọc)",
+    "reason": "Bắt chuyển khoản cọc giữ chân rồi chặn liên lạc.",
+    "reportedDate": "2026-06-25"
+  },
+  {
+    "phone": "0345987654",
+    "name": "Nguyễn Thị B",
+    "reason": "Lừa đảo phí làm hợp đồng, phí xem phòng.",
+    "reportedDate": "2026-06-28"
+  },
+  {
+    "phone": "0888999000",
+    "name": "Trần Văn C (Lừa đảo cọc giữ chỗ)",
+    "reason": "Yêu cầu đặt cọc giữ chỗ trước khi đến xem phòng rồi khóa máy.",
+    "reportedDate": "2026-06-29"
+  }
+]

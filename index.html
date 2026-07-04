@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Room Finder - Tìm Trọ & Phân Tích Lừa Đảo Sinh Viên</title>
+    
+    <!-- Google Fonts & FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet.js CSS (Bản đồ miễn phí) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    
+    <!-- CSS Custom -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Header ứng dụng -->
+    <header>
+        <div class="logo-container">
+            <i class="fa-solid fa-house-chimney-window logo-icon"></i>
+            <span class="logo-text">Smart Room Finder</span>
+        </div>
+        <div class="header-actions">
+            <div style="font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;" class="hide-mobile">
+                <i class="fa-solid fa-shield-halved" style="color: var(--color-primary)"></i>
+                <span>Cơ sở dữ liệu an toàn & minh bạch</span>
+            </div>
+            <button class="btn btn-primary" id="open-post-room-btn" style="background: var(--color-primary); color: white;">
+                <i class="fa-solid fa-house-medical"></i> Đăng Tin Cho Thuê
+            </button>
+            <button class="btn btn-danger" id="open-report-btn">
+                <i class="fa-solid fa-triangle-exclamation"></i> Báo Cáo Lừa Đảo
+            </button>
+        </div>
+    </header>
+
+    <!-- Thân ứng dụng chính -->
+    <div class="app-container">
+        
+        <!-- Sidebar bên trái (Lọc, Danh sách & Phân tích) -->
+        <aside class="sidebar" id="sidebar">
+            <nav class="tab-nav">
+                <button class="tab-btn active" data-tab="find-rooms" style="padding: 10px 4px;">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                    <span style="font-size: 11px;">Tìm Trọ</span>
+                </button>
+                <button class="tab-btn" data-tab="roommate" style="padding: 10px 4px;">
+                    <i class="fa-solid fa-people-arrows"></i>
+                    <span style="font-size: 11px;">Ở Ghép</span>
+                </button>
+                <button class="tab-btn" data-tab="analyze-post" style="padding: 10px 4px;">
+                    <i class="fa-solid fa-brain"></i>
+                    <span style="font-size: 11px;">Phân Tích</span>
+                </button>
+                <button class="tab-btn" data-tab="blacklist" style="padding: 10px 4px;">
+                    <i class="fa-solid fa-user-shield"></i>
+                    <span style="font-size: 11px;">Blacklist</span>
+                </button>
+            </nav>
+
+            <!-- Các nội dung tabs -->
+            <div class="tab-content-wrapper">
+                
+                <!-- TAB 1: TÌM KIẾM PHÒNG TRỌ -->
+                <div class="tab-panel active" id="tab-find-rooms">
+                    <!-- Khu vực lọc -->
+                    <div class="filter-group">
+                        <div class="filter-title">
+                            <i class="fa-solid fa-sliders"></i> Bộ lọc phòng trọ
+                        </div>
+                        
+                        <!-- Chọn trường Đại học -->
+                        <div class="filter-input-group" style="position: relative;">
+                            <label for="uni-search-input">Trường Đại học, Cao đẳng</label>
+                            <div style="position: relative; display: flex; align-items: center;">
+                                <input type="text" id="uni-search-input" placeholder="Gõ tên trường (VD: Bách Khoa, Thủy Lợi...)" autocomplete="off" style="padding-right: 36px;">
+                                <button id="clear-uni-btn" style="position: absolute; right: 10px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; display: none;">&times;</button>
+                            </div>
+                            <div id="uni-suggestions" class="suggestions-container" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; z-index: 1010; box-shadow: var(--shadow-main);"></div>
+                        </div>
+
+                        <!-- Chọn địa giới hành chính (Tỉnh/Thành & Phường/Xã) -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                            <div class="filter-input-group">
+                                <label for="filter-province">Tỉnh / Thành phố</label>
+                                <select id="filter-province" style="width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-size: 12px;">
+                                    <option value="">Tất cả Tỉnh/Thành</option>
+                                </select>
+                            </div>
+                            <div class="filter-input-group">
+                                <label for="filter-ward">Phường / Xã</label>
+                                <select id="filter-ward" disabled style="width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-size: 12px;">
+                                    <option value="">Tất cả Phường/Xã</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Chọn khoảng cách -->
+                        <div class="filter-input-group">
+                            <label for="filter-distance">Bán kính xung quanh</label>
+                            <select id="filter-distance">
+                                <option value="all">Tất cả khoảng cách</option>
+                                <option value="0.5">Dưới 500m (Đi bộ dễ dàng)</option>
+                                <option value="1">Dưới 1km (Tiện đi lại)</option>
+                                <option value="2">Dưới 2km (Đi xe máy/xe đạp)</option>
+                            </select>
+                        </div>
+
+                        <!-- Chọn khoảng giá -->
+                        <div class="filter-input-group">
+                            <label>Khoảng giá thuê (VND)</label>
+                            <div class="range-inputs">
+                                <input type="number" id="filter-price-min" placeholder="Tối thiểu" min="0">
+                                <span>-</span>
+                                <input type="number" id="filter-price-max" placeholder="Tối đa" min="0">
+                            </div>
+                        </div>
+
+                        <!-- Chọn loại tin đăng -->
+                        <div class="filter-input-group">
+                            <label for="filter-owner">Đối tượng đăng tin</label>
+                            <select id="filter-owner">
+                                <option value="all">Tất cả đối tượng</option>
+                                <option value="owner">Chủ nhà trực tiếp (Owner)</option>
+                                <option value="broker">Môi giới (Broker)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Tiêu đề kết quả & Danh sách phòng -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                        <h4 style="font-family: var(--font-heading); font-weight: 600; font-size: 14px; color: var(--text-secondary);">
+                            KẾT QUẢ TÌM KIẾM (<span id="results-count">0</span>)
+                        </h4>
+                        <span style="font-size: 11px; color: var(--text-muted);">Click vào thẻ để xem vị trí</span>
+                    </div>
+
+                    <div class="room-list-container" id="room-list">
+                        <!-- Render động từ app.js -->
+                    </div>
+                </div>
+
+                <!-- TAB 2: TÌM BẠN Ở GHÉP MATCHMAKER -->
+                <div class="tab-panel" id="tab-roommate">
+                    <!-- Khu vực lọc thói quen của bản thân -->
+                    <div class="filter-group" style="padding: 14px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <div class="filter-title" style="margin-bottom: 8px;">
+                            <i class="fa-solid fa-user-gear" style="color: var(--color-primary);"></i> Thiết lập thói quen của bạn
+                        </div>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4; margin-top: 0;">
+                            Hệ thống dựa trên thói quen này để chấm điểm độ tương thích (%) của bạn với các bạn đang tìm ở ghép dưới đây.
+                        </p>
+                        
+                        <!-- Giới tính yêu cầu -->
+                        <div class="filter-input-group" style="margin-bottom: 10px;">
+                            <label for="my-gender" style="font-size: 11px; display: block; margin-bottom: 4px; font-weight: 500;">Giới tính của bạn</label>
+                            <select id="my-gender" style="width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-size: 12px;">
+                                <option value="Nam">Nam</option>
+                                <option value="Nữ">Nữ</option>
+                            </select>
+                        </div>
+
+                        <!-- Thói quen Hút thuốc -->
+                        <div class="filter-input-group" style="margin-bottom: 10px;">
+                            <label for="my-smoking" style="font-size: 11px; display: block; margin-bottom: 4px; font-weight: 500;">Bạn có hút thuốc không?</label>
+                            <select id="my-smoking" style="width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-size: 12px;">
+                                <option value="no">Không hút thuốc</option>
+                                <option value="yes">Có hút thuốc</option>
+                            </select>
+                        </div>
+
+                        <!-- Thói quen Giờ giấc -->
+                        <div class="filter-input-group" style="margin-bottom: 10px;">
+                            <label for="my-sleep" style="font-size: 11px; display: block; margin-bottom: 4px; font-weight: 500;">Giờ giấc sinh hoạt</label>
+                            <select id="my-sleep" style="width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-size: 12px;">
+                                <option value="late">Hay thức khuya (Cú đêm)</option>
+                                <option value="early">Ngủ sớm dậy sớm</option>
+                            </select>
+                        </div>
+
+                        <!-- Mức độ ngăn nắp -->
+                        <div class="filter-input-group" style="margin-bottom: 12px;">
+                            <label style="font-size: 11px; display: block; margin-bottom: 4px; font-weight: 500;">Độ ngăn nắp của bạn (1 - 5)</label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="range" id="my-cleanliness" min="1" max="5" value="4" style="flex: 1; accent-color: var(--color-primary); cursor: pointer;">
+                                <span id="my-cleanliness-val" style="font-weight: 600; color: var(--color-primary); font-size: 12px;">4/5</span>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" id="open-post-roommate-btn" style="width: 100%; justify-content: center; font-size: 12px; padding: 8px 12px; background: var(--color-primary); color: white;">
+                            <i class="fa-solid fa-user-plus"></i> Đăng Ký Tìm Ở Ghép
+                        </button>
+                    </div>
+
+                    <!-- Danh sách ứng viên -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; margin-bottom: 8px;">
+                        <h4 style="font-family: var(--font-heading); font-weight: 600; font-size: 13px; color: var(--text-secondary); margin: 0;">
+                            ỨNG VIÊN TƯƠNG THÍCH (<span id="roommates-count">0</span>)
+                        </h4>
+                    </div>
+
+                    <div class="roommate-list-container" id="roommate-list" style="display: flex; flex-direction: column; gap: 12px; overflow-y: auto; max-height: calc(100vh - 430px); padding-right: 4px;">
+                        <!-- Render động từ app.js -->
+                    </div>
+                </div>
+
+                <!-- TAB 3: BỘ PHÂN TÍCH TIN ĐĂNG -->
+                <div class="tab-panel" id="tab-analyze-post">
+                    <div class="analyzer-container">
+                        <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); padding: 12px; border-radius: 8px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);">
+                            <i class="fa-solid fa-circle-info" style="color: var(--color-primary); margin-right: 6px;"></i>
+                            Dán nội dung tin đăng phòng trọ hoặc bài viết Facebook vào ô dưới đây. Thuật toán sẽ quét số điện thoại, định vị địa chỉ và kiểm tra dấu hiệu lừa đảo.
+                        </div>
+
+                        <div class="textarea-container">
+                            <textarea id="analyze-input" class="analyzer-textarea" placeholder="Ví dụ: Cần cho thuê phòng trọ giá 1tr5 cực đẹp ngõ 105 Xuân Thủy Cầu Giấy, đầy đủ điều hòa nóng lạnh. Yêu cầu chuyển khoản đặt cọc giữ chỗ trước 1 triệu vì đang có rất nhiều người hỏi, liên hệ SĐT: 0944333222..."></textarea>
+                        </div>
+
+                        <button class="btn btn-primary" id="analyze-btn" style="justify-content: center; width: 100%;">
+                            <i class="fa-solid fa-magnifying-glass-chart"></i> Bắt đầu phân tích bài đăng
+                        </button>
+
+                        <!-- Kết quả phân tích -->
+                        <div class="analyzer-results" id="analyzer-results" style="display: none;">
+                            <h4 style="font-family: var(--font-heading); font-size: 15px; font-weight: 600; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                                <i class="fa-solid fa-square-poll-vertical"></i> Kết Quả Đánh Giá Rủi Ro
+                            </h4>
+
+                            <!-- Thẻ kết quả tổng quan -->
+                            <div class="result-card" id="risk-summary-card">
+                                <div class="result-title" id="risk-title">
+                                    <!-- Điền động -->
+                                </div>
+                                <div class="result-desc" id="risk-description">
+                                    <!-- Điền động -->
+                                </div>
+                            </div>
+
+                            <!-- Thông tin trích xuất -->
+                            <div class="extracted-grid">
+                                <div class="extracted-item">
+                                    <div class="extracted-label">Số điện thoại liên lạc</div>
+                                    <div class="extracted-value" id="ext-phone">-</div>
+                                </div>
+                                <div class="extracted-item">
+                                    <div class="extracted-label">Giá ước lượng</div>
+                                    <div class="extracted-value" id="ext-price">-</div>
+                                </div>
+                                <div class="extracted-item">
+                                    <div class="extracted-label">Độ an toàn</div>
+                                    <div class="extracted-value" id="ext-safety">-</div>
+                                </div>
+                                <div class="extracted-item">
+                                    <div class="extracted-label">Nhận diện tác giả</div>
+                                    <div class="extracted-value" id="ext-type">-</div>
+                                </div>
+                            </div>
+
+                            <!-- Điểm nghi vấn chi tiết -->
+                            <div id="risk-points-container" style="display: flex; flex-direction: column; gap: 8px;">
+                                <!-- Điền động -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: DANH SÁCH ĐEN SĐT LỪA ĐẢO -->
+                <div class="tab-panel" id="tab-blacklist">
+                    <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.15); padding: 12px; border-radius: 8px; font-size: 13px; line-height: 1.5; color: var(--text-secondary);">
+                        <i class="fa-solid fa-shield-halved" style="color: var(--color-danger); margin-right: 6px;"></i>
+                        Tra cứu số điện thoại hoặc tên người đăng tin trọ trước khi chuyển khoản cọc. Báo cáo của bạn giúp bảo vệ hàng ngàn sinh viên khác!
+                    </div>
+
+                    <!-- Tìm kiếm blacklist -->
+                    <div class="blacklist-search-box">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="blacklist-search-input" placeholder="Nhập số điện thoại cần kiểm tra...">
+                    </div>
+
+                    <!-- Tiêu đề & Danh sách đối tượng lừa đảo -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                        <h4 style="font-family: var(--font-heading); font-weight: 600; font-size: 14px; color: var(--text-secondary);">
+                            DANH SÁCH BỊ BÁO CÁO
+                        </h4>
+                        <span style="font-size: 12px; color: var(--text-muted);" id="blacklist-count">3 đối tượng</span>
+                    </div>
+
+                    <div class="blacklist-list" id="blacklist-container">
+                        <!-- Điền động từ app.js -->
+                    </div>
+                </div>
+
+
+
+            </div>
+        </aside>
+
+        <!-- Bản đồ bên phải -->
+        <main class="map-container">
+            <div id="map"></div>
+            
+            <!-- Nút bật/tắt bản đồ trên Mobile -->
+            <button class="btn btn-primary mobile-toggle" id="mobile-map-toggle">
+                <i class="fa-solid fa-list"></i> Xem danh sách
+            </button>
+        </main>
+
+    </div>
+
+    <!-- MODAL ĐĂNG TIN PHÒNG TRỌ (CHỦ TRỌ) -->
+    <div class="modal-overlay" id="post-room-modal">
+        <div class="modal-card" style="width: 950px; max-width: 95%;">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fa-solid fa-house-medical" style="color: var(--color-primary)"></i> Đăng Tin Cho Thuê Trọ</h3>
+                <button class="close-modal" id="close-post-modal-btn">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding-right: 4px;">
+                <div class="post-modal-grid">
+                    
+                    <!-- Cột trái: Điền thông tin -->
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <div class="form-group">
+                            <label for="post-title">Tiêu đề tin đăng (*)</label>
+                            <input type="text" id="post-title" placeholder="VD: Phòng trọ khép kín Xuân Thủy đầy đủ tiện nghi" required>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div class="form-group">
+                                <label for="post-price">Giá thuê (VND/tháng) (*)</label>
+                                <input type="number" id="post-price" placeholder="VD: 3500000" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="post-deposit">Tiền cọc (VND) (*)</label>
+                                <input type="number" id="post-deposit" placeholder="VD: 1500000" required>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div class="form-group">
+                                <label for="post-phone">Số điện thoại liên hệ (*)</label>
+                                <input type="text" id="post-phone" placeholder="VD: 0987654321" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="post-owner-name">Tên người liên hệ (*)</label>
+                                <input type="text" id="post-owner-name" placeholder="VD: Anh Nam" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="post-address">Địa chỉ chi tiết (*)</label>
+                            <input type="text" id="post-address" placeholder="Chọn trên bản đồ bên phải hoặc tự nhập..." required>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div class="form-group">
+                                <label for="post-lat">Vĩ độ (Latitude) (*)</label>
+                                <input type="number" id="post-lat" placeholder="Click bản đồ bên phải..." step="0.000001" readonly required>
+                            </div>
+                            <div class="form-group">
+                                <label for="post-lon">Kinh độ (Longitude) (*)</label>
+                                <input type="number" id="post-lon" placeholder="Click bản đồ bên phải..." step="0.000001" readonly required>
+                            </div>
+                        </div>
+
+                        <!-- Tải ảnh phòng trọ -->
+                        <div class="form-group">
+                            <label>Hình ảnh phòng trọ (Tối đa 4 ảnh, định dạng PNG/JPG) (*)</label>
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                <input type="file" id="post-images" accept="image/png, image/jpeg" multiple style="display: none;">
+                                <button type="button" class="btn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 13px;" onclick="document.getElementById('post-images').click()">
+                                    <i class="fa-solid fa-camera"></i> Chọn ảnh phòng
+                                </button>
+                                <span id="post-upload-status" style="font-size: 12px; color: var(--text-muted);">Đã chọn 0/4 ảnh</span>
+                            </div>
+                            <div id="post-image-previews" style="display: flex; gap: 8px; flex-wrap: wrap;"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Tiện nghi phòng</label>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);" id="post-checkboxes">
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="AC"> Điều hòa</label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="Wifi"> Wifi</label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="Bed"> Giường</label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="Wardrobe"> Tủ đồ</label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="Heater"> Nóng lạnh</label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="Fridge"> Tủ lạnh</label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="Balcony"> Ban công</label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="Kitchen"> Bếp nấu</label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="WashingMachine"> Máy giặt</label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="post-desc">Mô tả bổ sung</label>
+                            <textarea id="post-desc" placeholder="Chi tiết thời gian đi lại, điện nước, gửi xe..." style="height: 60px; resize: none;"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Cột phải: Bản đồ định vị -->
+                    <div style="display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0;">
+                        <div class="form-group" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0;">
+                            <label style="font-weight: 600; margin-bottom: 6px;">Chọn vị trí ghim trên bản đồ (*)</label>
+                            <div id="post-mini-map" style="flex: 1; min-height: 420px; border-radius: 12px; border: 1px solid var(--border-color); z-index: 1;"></div>
+                            <span class="input-hint" id="post-map-hint" style="margin-top: 8px; line-height: 1.4;"><i class="fa-solid fa-map-location-dot"></i> Di chuyển bản đồ và click chọn đúng vị trí nhà trọ của bạn. Tọa độ và địa chỉ chi tiết sẽ được tự động điền sang bên trái.</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" style="background: rgba(255,255,255,0.05); color: var(--text-secondary);" id="cancel-post-btn">Hủy bỏ</button>
+                <button class="btn btn-primary" id="submit-post-btn" style="background: var(--color-primary); color: white; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-paper-plane"></i> Gửi Yêu Cầu Đăng Tin
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL BÁO CÁO LỪA ĐẢO -->
+    <div class="modal-overlay" id="report-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fa-solid fa-triangle-exclamation" style="color: var(--color-danger)"></i> Gửi Báo Cáo Đối Tượng Lừa Đảo</h3>
+                <button class="close-modal" id="close-modal-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="report-phone">Số điện thoại đối tượng (*)</label>
+                    <input type="text" id="report-phone" placeholder="Ví dụ: 0987654xxx..." required>
+                </div>
+                <div class="form-group">
+                    <label for="report-name">Tên hiển thị / Biệt danh (nếu có)</label>
+                    <input type="text" id="report-name" placeholder="Ví dụ: Lê Văn A, Môi giới Cầu Giấy...">
+                </div>
+                <div class="form-group">
+                    <label for="report-reason">Mô tả hành vi lừa đảo / Lý do cảnh báo (*)</label>
+                    <textarea id="report-reason" style="height: 100px; resize: none;" placeholder="Mô tả chi tiết cách thức lừa đảo (ví dụ: đòi cọc giữ phòng trước rồi chặn số, lừa phí xem phòng...)" required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" style="background: rgba(255,255,255,0.05); color: var(--text-secondary);" id="cancel-report-btn">Hủy bỏ</button>
+                <button class="btn btn-primary" style="background: var(--color-danger); color: white;" id="submit-report-btn">Gửi Báo Cáo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CHI TIẾT PHÒNG TRỌ -->
+    <div class="modal-overlay" id="room-details-modal">
+        <div class="modal-card" style="width: 550px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="detail-title">Chi Tiết Phòng Trọ</h3>
+                <button class="close-modal" id="close-detail-modal-btn">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding-right: 4px;">
+                <!-- Room Images Carousel -->
+                <div id="detail-images-container" style="display: none; margin-bottom: 15px;">
+                    <div id="detail-images" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;">
+                        <!-- Dynamic images will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Tag & Status -->
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="detail-tags">
+                    <!-- Dynamic tags -->
+                </div>
+
+                <!-- Price & Deposit -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px;">
+                        <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">GIÁ THUÊ</span>
+                        <span id="detail-price" style="font-family: var(--font-heading); font-size: 20px; font-weight: 700; color: var(--color-primary);">-</span>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px;">
+                        <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">TIỀN ĐẶT CỌC</span>
+                        <span id="detail-deposit" style="font-family: var(--font-heading); font-size: 20px; font-weight: 700; color: var(--text-primary);">-</span>
+                    </div>
+                </div>
+
+                <!-- Address -->
+                <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 10px;">
+                    <span style="font-size: 11px; color: var(--text-muted);">ĐỊA CHỈ PHÒNG TRỌ</span>
+                    <span id="detail-address" style="font-size: 14px; font-weight: 500; color: var(--text-primary);"><i class="fa-solid fa-location-dot" style="color: var(--color-danger); margin-right: 6px;"></i>-</span>
+                </div>
+
+                <!-- Description -->
+                <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 10px;">
+                    <span style="font-size: 11px; color: var(--text-muted);">MÔ TẢ CHI TIẾT</span>
+                    <p id="detail-desc" style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.5; white-space: pre-line; background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px;">-</p>
+                </div>
+
+                <!-- Amenities -->
+                <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px;">
+                    <span style="font-size: 11px; color: var(--text-muted);">TIỆN NGHI PHÒNG</span>
+                    <div id="detail-amenities" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                        <!-- Dynamic amenities -->
+                    </div>
+                </div>
+
+                <!-- Contact Info -->
+                <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); padding: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                    <div>
+                        <div style="font-size: 11px; color: var(--text-muted);">LIÊN HỆ CHÍNH CHỦ</div>
+                        <div style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 2px 0;" id="detail-owner-name">-</div>
+                        <div style="font-size: 14px; font-weight: 600; color: var(--color-primary);" id="detail-phone">-</div>
+                    </div>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <a href="#" class="btn" id="btn-call-phone" style="background: #22c55e; color: white; padding: 8px 12px; font-size: 12px; text-decoration: none; font-weight: 600;">
+                            <i class="fa-solid fa-phone"></i> Gọi điện
+                        </a>
+                        <a href="#" target="_blank" class="btn" id="btn-zalo-contact" style="background: #2563eb; color: white; padding: 8px 12px; font-size: 12px; text-decoration: none; font-weight: 600;">
+                            <i class="fa-solid fa-comment-dots"></i> Zalo
+                        </a>
+                        <button class="btn" id="btn-copy-phone" style="background: rgba(255,255,255,0.05); color: var(--text-secondary); border: 1px solid var(--border-color); padding: 8px 12px; font-size: 12px; font-weight: 600;">
+                            <i class="fa-solid fa-copy"></i> Sao chép
+                        </button>
+                        <button class="btn" id="btn-report-rented" style="background: rgba(239, 68, 68, 0.08); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); padding: 8px 12px; font-size: 12px; font-weight: 600; width: 100%; margin-top: 4px;">
+                            <i class="fa-solid fa-house-circle-xmark"></i> Báo hết phòng / Đã thuê
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid var(--border-color);">
+                <button class="btn btn-primary" id="close-detail-modal-btn-footer" style="width: 100%; justify-content: center;">Đóng Lại</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ĐĂNG KÝ TÌM BẠN Ở GHÉP -->
+    <div class="modal-overlay" id="roommate-modal">
+        <div class="modal-card" style="width: 500px; max-width: 95%;">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fa-solid fa-user-plus" style="color: var(--color-primary)"></i> Đăng Ký Tìm Bạn Ở Ghép</h3>
+                <button class="close-modal" id="close-roommate-modal-btn">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding-right: 4px;">
+                <form id="roommate-form" style="display: flex; flex-direction: column; gap: 12px;">
+                    <div class="form-group">
+                        <label for="rm-name">Họ và tên (*)</label>
+                        <input type="text" id="rm-name" placeholder="VD: Nguyễn Văn A" required style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); border-radius: 4px; padding: 8px; font-size: 12px;">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
+                            <label for="rm-gender">Giới tính (*)</label>
+                            <select id="rm-gender" required style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); border-radius: 4px; padding: 8px; font-size: 12px;">
+                                <option value="Nam">Nam</option>
+                                <option value="Nữ">Nữ</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="rm-phone">Số điện thoại / Zalo (*)</label>
+                            <input type="tel" id="rm-phone" placeholder="VD: 0987654321" required style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); border-radius: 4px; padding: 8px; font-size: 12px;">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
+                            <label for="rm-school">Trường Đại học (*)</label>
+                            <select id="rm-school" required style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); border-radius: 4px; padding: 8px; font-size: 12px;">
+                                <option value="hust">Đại học Bách Khoa (HUST)</option>
+                                <option value="neu">Đại học Kinh tế Quốc dân (NEU)</option>
+                                <option value="ftu">Đại học Ngoại thương (FTU)</option>
+                                <option value="vnu">Đại học Quốc gia Hà Nội (VNU)</option>
+                                <option value="tlu">Đại học Thủy lợi (TLU)</option>
+                                <option value="ptit">Học viện Bưu chính Viễn thông (PTIT)</option>
+                                <option value="tnu-hg">ĐH Thái Nguyên tại Hà Giang (TNU-HG)</option>
+                                <option value="tnu">Đại học Thái Nguyên (TNU)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="rm-budget">Ngân sách tối đa (VND/tháng) (*)</label>
+                            <input type="number" id="rm-budget" placeholder="VD: 2000000" min="500000" step="100000" required style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); border-radius: 4px; padding: 8px; font-size: 12px;">
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                        <h4 style="margin: 0 0 10px 0; font-size: 12px; color: var(--text-secondary); font-family: var(--font-heading);">Thói quen sinh hoạt của bạn</h4>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+                            <div class="form-group">
+                                <label for="rm-smoking-form" style="font-size: 11px; display: block; margin-bottom: 4px; font-weight: 500;">Bạn có hút thuốc?</label>
+                                <select id="rm-smoking-form" required style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); border-radius: 4px; padding: 8px; font-size: 12px;">
+                                    <option value="no">Không</option>
+                                    <option value="yes">Có</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="rm-sleep-form" style="font-size: 11px; display: block; margin-bottom: 4px; font-weight: 500;">Giờ giấc ngủ</label>
+                                <select id="rm-sleep-form" required style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); border-radius: 4px; padding: 8px; font-size: 12px;">
+                                    <option value="late">Hay thức muộn (Late)</option>
+                                    <option value="early">Ngủ sớm dậy sớm (Early)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="rm-cleanliness-form" style="font-size: 11px; display: block; margin-bottom: 4px; font-weight: 500;">Độ ngăn nắp, gọn gàng (1 - 5 Sao)</label>
+                            <select id="rm-cleanliness-form" required style="width: 100%; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); border-radius: 4px; padding: 8px; font-size: 12px;">
+                                <option value="5">5/5 - Rất sạch sẽ gọn gàng</option>
+                                <option value="4" selected>4/5 - Gọn gàng ngăn nắp</option>
+                                <option value="3">3/5 - Bình thường</option>
+                                <option value="2">2/5 - Hơi bừa bộn</option>
+                                <option value="1">1/5 - Thoải mái/bừa bộn</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rm-desc" style="font-size: 11px; display: block; margin-bottom: 4px; font-weight: 500;">Mô tả bản thân & yêu cầu đối với bạn ở cùng (*)</label>
+                        <textarea id="rm-desc" rows="3" placeholder="Giới thiệu bản thân, tính cách, yêu cầu đối với bạn cùng phòng..." required style="width:100%; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); border-radius: 4px; padding: 8px; font-size: 12px; font-family: inherit; resize: none;"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 13px; padding: 10px 14px; background: var(--color-primary); color: white; margin-top: 8px;">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Gửi Hồ Sơ Ở Ghép
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div class="toast" id="toast-notification">
+        <i class="fa-solid fa-check-circle" id="toast-icon"></i>
+        <span id="toast-message">Đã sao chép liên kết thành công!</span>
+    </div>
+
+    <!-- Thư viện bản đồ Leaflet.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    
+    <!-- Các file JS của ứng dụng -->
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
