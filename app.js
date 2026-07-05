@@ -204,6 +204,48 @@ function initSchoolAutocomplete() {
         }, 400); // Đợi 400ms sau khi ngừng gõ để tránh spam API
     });
 
+    // Hỗ trợ bấm Enter để tự động chọn gợi ý đầu tiên hoặc tìm kiếm chính xác
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const suggestionsContainer = document.getElementById('uni-suggestions');
+            const items = suggestionsContainer.querySelectorAll('.suggestion-item');
+            if (items.length > 0) {
+                // Click gợi ý đầu tiên
+                items[0].click();
+            } else {
+                const query = input.value.trim().toLowerCase();
+                if (query !== '') {
+                    const matched = UNIVERSITIES.find(uni => 
+                        uni.name.toLowerCase().includes(query) || 
+                        (uni.abbr && uni.abbr.toLowerCase().includes(query))
+                    );
+                    if (matched) {
+                        selectSchool(matched);
+                    }
+                }
+            }
+            suggestionsContainer.style.display = 'none';
+        }
+    });
+
+    // Tự động khớp và chọn khi click ra ngoài hoặc đổi giá trị
+    input.addEventListener('change', () => {
+        const query = input.value.trim().toLowerCase();
+        if (query === '') return;
+        
+        if (appState.selectedSchool && appState.selectedSchool.name.toLowerCase() === query) return;
+        
+        const matched = UNIVERSITIES.find(uni => 
+            uni.name.toLowerCase() === query || 
+            uni.name.toLowerCase().includes(query) ||
+            (uni.abbr && uni.abbr.toLowerCase() === query)
+        );
+        if (matched) {
+            selectSchool(matched);
+        }
+    });
+
     // Click nút X để xóa tìm kiếm
     clearBtn.addEventListener('click', () => {
         input.value = '';
@@ -260,6 +302,9 @@ function selectSchool(school) {
     appState.selectedSchool = school;
     document.getElementById('uni-search-input').value = school.name;
     document.getElementById('clear-uni-btn').style.display = 'block';
+
+    // XÓA LẬP TỨC tin trọ cũ, thay bằng danh sách thuộc khu vực trường mới chọn
+    appState.rooms = getRoomsForLocation(school.coords[0], school.coords[1], school.id);
 
     // Xóa ghim cũ, thêm ghim mới của trường học
     if (appState.uniMarker) {
