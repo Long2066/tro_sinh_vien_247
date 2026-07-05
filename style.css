@@ -1107,6 +1107,7 @@ select:focus, input:focus, textarea:focus {
     }
 
     .app-container {
+        height: calc(100dvh - 52px) !important;
         height: calc(100vh - 52px) !important;
     }
 
@@ -1117,6 +1118,10 @@ select:focus, input:focus, textarea:focus {
     select,
     textarea {
         font-size: 16px !important;
+    }
+
+    .tab-content-wrapper {
+        padding: 16px 16px 120px 16px !important;
     }
     
     /* Bố cục bộ lọc tìm kiếm di động */
@@ -1221,6 +1226,7 @@ select:focus, input:focus, textarea:focus {
     }
 
     .app-container.map-collapsed .sidebar {
+        height: calc(100dvh - 52px) !important;
         height: calc(100vh - 52px) !important;
         position: relative !important;
         z-index: 100 !important;
