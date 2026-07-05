@@ -415,8 +415,11 @@ function formatAddressToPostMerger(address) {
         cleanParts.push(newWard);
     }
 
-    if (address.includes("Hà Giang") || address.includes("Tuyên Quang")) {
+    if (address.includes("Tuyên Quang")) {
         cleanParts.push("Tuyên Quang");
+    }
+    if (address.includes("Hà Giang")) {
+        cleanParts.push("Hà Giang");
     }
 
     formatted = cleanParts.filter((v, i, a) => v && a.indexOf(v) === i).join(', ');

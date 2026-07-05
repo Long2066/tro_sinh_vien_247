@@ -227,7 +227,7 @@ const UNIVERSITIES = [
         name: "Phân hiệu Đại học Thái Nguyên tại Hà Giang",
         abbr: "TNU-HG",
         coords: [22.8123623, 104.9814349],
-        address: "Đường Nguyễn Du, Tổ 16, Phường Hà Giang 1, Tuyên Quang"
+        address: "Đường Nguyễn Du, Tổ 16, Phường Nguyễn Trãi, Thành phố Hà Giang, Tỉnh Hà Giang"
     },
     {
         id: "tnu",
