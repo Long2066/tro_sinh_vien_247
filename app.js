@@ -311,7 +311,16 @@ function renderSchoolSuggestions(schools) {
 function selectSchool(school) {
     if (!school) return;
     appState.selectedSchool = school;
-    document.getElementById('uni-search-input').value = school.name;
+    
+    const input = document.getElementById('uni-search-input');
+    const suggestionsContainer = document.getElementById('uni-suggestions');
+    if (input) {
+        input.value = school.name;
+        input.blur();
+    }
+    if (suggestionsContainer) {
+        suggestionsContainer.style.display = 'none';
+    }
     document.getElementById('clear-uni-btn').style.display = 'block';
 
     // XÓA LẬP TỨC tin trọ cũ, thay bằng danh sách thuộc khu vực trường mới chọn
@@ -477,11 +486,8 @@ function formatAddressToPostMerger(address) {
         cleanParts.push(newWard);
     }
 
-    if (address.includes("Tuyên Quang")) {
+    if (address.includes("Tuyên Quang") || address.includes("Hà Giang")) {
         cleanParts.push("Tuyên Quang");
-    }
-    if (address.includes("Hà Giang")) {
-        cleanParts.push("Hà Giang");
     }
 
     formatted = cleanParts.filter((v, i, a) => v && a.indexOf(v) === i).join(', ');
