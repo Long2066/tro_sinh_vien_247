@@ -1468,13 +1468,18 @@ function showRoomDetails(room) {
         imgContainer.style.display = 'none';
     }
 
-    document.getElementById('detail-title').textContent = room.title;
-    document.getElementById('detail-price').textContent = (room.price / 1000000).toFixed(1) + ' Tr/tháng';
-    document.getElementById('detail-deposit').textContent = (room.deposit / 1000000).toFixed(1) + ' Tr';
-    document.getElementById('detail-address').innerHTML = `<i class="fa-solid fa-location-dot" style="color: var(--color-danger); margin-right: 6px;"></i>${formatAddressToPostMerger(room.address)}`;
-    document.getElementById('detail-desc').textContent = room.description;
-    document.getElementById('detail-owner-name').textContent = room.ownerName;
-    document.getElementById('detail-phone').textContent = room.contactPhone;
+    document.getElementById('detail-title').textContent = room.title || 'Chi Tiết Phòng Trọ';
+    
+    const priceVal = parseFloat(room.price) || 0;
+    document.getElementById('detail-price').textContent = priceVal > 0 ? (priceVal / 1000000).toFixed(1) + ' Tr/tháng' : 'Liên hệ';
+    
+    const depositVal = parseFloat(room.deposit) || 0;
+    document.getElementById('detail-deposit').textContent = depositVal > 0 ? (depositVal / 1000000).toFixed(1) + ' Tr' : 'Không yêu cầu';
+    
+    document.getElementById('detail-address').innerHTML = `<i class="fa-solid fa-location-dot" style="color: var(--color-danger); margin-right: 6px;"></i>${formatAddressToPostMerger(room.address || '')}`;
+    document.getElementById('detail-desc').textContent = room.description || 'Không có mô tả chi tiết.';
+    document.getElementById('detail-owner-name').textContent = room.ownerName || 'Chủ trọ';
+    document.getElementById('detail-phone').textContent = room.contactPhone || 'Chưa cập nhật';
 
     // Render tags
     const tagsContainer = document.getElementById('detail-tags');
@@ -1482,12 +1487,12 @@ function showRoomDetails(room) {
     
     // Add owner/broker tag
     const ownerTag = document.createElement('span');
-    ownerTag.className = `badge ${room.ownerType === 'owner' ? 'badge-owner' : 'badge-broker'}`;
-    ownerTag.textContent = room.ownerType === 'owner' ? 'Chủ nhà thật' : 'Môi giới';
+    ownerTag.className = `badge ${room.ownerType === 'broker' ? 'badge-broker' : 'badge-owner'}`;
+    ownerTag.textContent = room.ownerType === 'broker' ? 'Môi giới' : 'Chủ nhà thật';
     tagsContainer.appendChild(ownerTag);
 
     // Add extra tags
-    if (room.tags) {
+    if (Array.isArray(room.tags)) {
         room.tags.forEach(t => {
             const tagSpan = document.createElement('span');
             tagSpan.className = 'badge';
@@ -1515,51 +1520,63 @@ function showRoomDetails(room) {
         "WashingMachine": { text: "Máy giặt", icon: "fa-soap" }
     };
 
-    room.amenities.forEach(key => {
-        const item = allAmenities[key];
-        if (item) {
-            const div = document.createElement('div');
-            div.style.fontSize = '13px';
-            div.style.color = 'var(--text-secondary)';
-            div.style.display = 'flex';
-            div.style.alignItems = 'center';
-            div.style.gap = '8px';
-            div.style.background = 'rgba(255,255,255,0.02)';
-            div.style.padding = '8px 12px';
-            div.style.borderRadius = '6px';
-            div.style.border = '1px solid var(--border-color)';
-            div.innerHTML = `<i class="fa-solid ${item.icon}" style="color: var(--color-primary);"></i> ${item.text}`;
-            amenitiesContainer.appendChild(div);
-        }
-    });
+    if (Array.isArray(room.amenities)) {
+        room.amenities.forEach(key => {
+            const item = allAmenities[key];
+            if (item) {
+                const div = document.createElement('div');
+                div.style.fontSize = '13px';
+                div.style.color = 'var(--text-secondary)';
+                div.style.display = 'flex';
+                div.style.alignItems = 'center';
+                div.style.gap = '8px';
+                div.style.background = 'rgba(255,255,255,0.02)';
+                div.style.padding = '8px 12px';
+                div.style.borderRadius = '6px';
+                div.style.border = '1px solid var(--border-color)';
+                div.innerHTML = `<i class="fa-solid ${item.icon}" style="color: var(--color-primary);"></i> ${item.text}`;
+                amenitiesContainer.appendChild(div);
+            }
+        });
+    }
 
     // Copy Phone button action
     const copyBtn = document.getElementById('btn-copy-phone');
-    copyBtn.onclick = () => {
-        navigator.clipboard.writeText(room.contactPhone).then(() => {
-            showToast('Đã sao chép số điện thoại chủ trọ!', false);
-        });
-    };
+    if (copyBtn) {
+        copyBtn.onclick = () => {
+            if (room.contactPhone) {
+                navigator.clipboard.writeText(room.contactPhone).then(() => {
+                    showToast('Đã sao chép số điện thoại chủ trọ!', false);
+                });
+            }
+        };
+    }
 
-    // Gọi điện button action
+    // Gửi nút Gọi điện và Zalo
+    const cleanPhone = room.contactPhone ? room.contactPhone.replace(/[\s\.-]/g, "") : "";
     const callBtn = document.getElementById('btn-call-phone');
-    callBtn.href = `tel:${room.contactPhone}`;
+    if (callBtn) {
+        callBtn.href = cleanPhone ? `tel:${cleanPhone}` : '#';
+    }
 
-    // Zalo link action
     const zaloLink = document.getElementById('btn-zalo-contact');
-    zaloLink.href = `https://zalo.me/${room.contactPhone}`;
+    if (zaloLink) {
+        zaloLink.href = cleanPhone ? `https://zalo.me/${cleanPhone}` : '#';
+    }
 
     // Báo cáo đã thuê action
     const rentedBtn = document.getElementById('btn-report-rented');
-    rentedBtn.onclick = () => {
-        if (confirm("Xác nhận báo cáo phòng trọ này đã được thuê hoặc hết phòng? Tin đăng này sẽ lập tức ẩn khỏi bản đồ của bạn.")) {
-            appState.rentedRoomIds.push(String(room.id));
-            localStorage.setItem('rented_rooms', JSON.stringify(appState.rentedRoomIds));
-            closeRoomDetailsModal();
-            applyFilters();
-            showToast("Đã ẩn phòng trọ đã thuê thành công!", false);
-        }
-    };
+    if (rentedBtn) {
+        rentedBtn.onclick = () => {
+            if (confirm("Xác nhận báo cáo phòng trọ này đã được thuê hoặc hết phòng? Tin đăng này sẽ lập tức ẩn khỏi bản đồ của bạn.")) {
+                appState.rentedRoomIds.push(String(room.id));
+                localStorage.setItem('rented_rooms', JSON.stringify(appState.rentedRoomIds));
+                closeRoomDetailsModal();
+                applyFilters();
+                showToast("Đã ẩn phòng trọ đã thuê thành công!", false);
+            }
+        };
+    }
 
     // Open the modal
     const modal = document.getElementById('room-details-modal');
