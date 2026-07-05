@@ -765,14 +765,16 @@ function renderRooms(roomsToRender) {
             "WashingMachine": '<i class="fa-solid fa-soap" title="Máy giặt"></i>'
         };
 
-        const roomAmenitiesHTML = room.amenities
+        const amenitiesArr = Array.isArray(room.amenities) ? room.amenities : [];
+        const roomAmenitiesHTML = amenitiesArr
             .map(a => amenitiesIcons[a] || '')
             .filter(Boolean)
             .slice(0, 5) // Hiển thị tối đa 5 icon
             .join(' ');
 
         // Định dạng tiền tệ
-        const formattedPrice = (room.price / 1000000).toFixed(1) + ' Tr';
+        const priceVal = parseFloat(room.price) || 0;
+        const formattedPrice = priceVal > 0 ? (priceVal / 1000000).toFixed(1) + ' Tr' : 'Thỏa thuận';
 
         // Render nhãn tags phụ trên thẻ phòng trọ danh sách
         let tagsHTML = '';
@@ -794,7 +796,7 @@ function renderRooms(roomsToRender) {
 
         card.innerHTML = `
             <div class="room-header">
-                <h3 class="room-title">${room.title}</h3>
+                <h3 class="room-title">${room.title || 'Phòng trọ'}</h3>
                 <span class="badge ${badgeClass}">${badgeText}</span>
             </div>
             
@@ -802,13 +804,13 @@ function renderRooms(roomsToRender) {
                 <div class="room-price">${formattedPrice}<span>/tháng</span></div>
                 <div style="font-size: 13px; color: var(--text-secondary); display: flex; gap: 6px; align-items: center;">
                      ${roomAmenitiesHTML}
-                     ${room.amenities.length > 5 ? `<span style="font-size: 10px; color: var(--text-muted)">+${room.amenities.length - 5}</span>` : ''}
+                     ${amenitiesArr.length > 5 ? `<span style="font-size: 10px; color: var(--text-muted)">+${amenitiesArr.length - 5}</span>` : ''}
                 </div>
             </div>
 
             <div class="room-address">
                 <i class="fa-solid fa-location-dot" style="color: var(--color-danger)"></i>
-                <span>${formatAddressToPostMerger(room.address)}</span>
+                <span>${formatAddressToPostMerger(room.address || '')}</span>
             </div>
             
             ${tagsHTML}
@@ -816,10 +818,10 @@ function renderRooms(roomsToRender) {
             <div class="room-details" style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
                 <div class="room-rating">
                     <i class="fa-solid fa-star"></i>
-                    <span>${room.rating}</span>
+                    <span>${room.rating || 5.0}</span>
                 </div>
                 <div style="font-size: 12px; color: var(--text-secondary);">
-                    Đăng bởi: <strong>${room.ownerName}</strong>
+                    Đăng bởi: <strong>${room.ownerName || 'Chủ trọ'}</strong>
                 </div>
             </div>
 
