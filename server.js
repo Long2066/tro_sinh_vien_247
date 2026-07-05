@@ -323,8 +323,8 @@ function extractPhone(body = '', defaultPhone = '') {
     return defaultPhone;
 }
 
-// Khởi tạo Server HTTP
-const server = http.createServer(async (req, res) => {
+// Hàm xử lý request HTTP chính
+const requestHandler = async (req, res) => {
     // Cài đặt CORS Header để frontend gọi từ file:// hoặc localhost đều được
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE');
@@ -1009,12 +1009,19 @@ const server = http.createServer(async (req, res) => {
             res.end(content, 'utf-8');
         }
     });
-});
+};
 
-server.listen(PORT, () => {
-    console.log(`\n======================================================`);
-    console.log(`🚀 [SERVER KHỞI CHẠY] Smart Room Finder đang hoạt động!`);
-    console.log(`👉 Truy cập giao diện chính: http://localhost:${PORT}`);
-    console.log(`👉 Cổng API tin thật: http://localhost:${PORT}/api/rooms`);
-    console.log(`======================================================\n`);
-});
+// Xuất module requestHandler cho Vercel Serverless Function
+module.exports = requestHandler;
+
+// Lắng nghe cổng nếu chạy dưới môi trường Node.js local
+if (!process.env.VERCEL) {
+    const server = http.createServer(requestHandler);
+    server.listen(PORT, () => {
+        console.log(`\n======================================================`);
+        console.log(`🚀 [SERVER KHỞI CHẠY] Smart Room Finder đang hoạt động!`);
+        console.log(`👉 Truy cập giao diện chính: http://localhost:${PORT}`);
+        console.log(`👉 Cổng API tin thật: http://localhost:${PORT}/api/rooms`);
+        console.log(`======================================================\n`);
+    });
+}
