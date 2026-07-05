@@ -927,10 +927,25 @@ window.selectRoomCard = function(roomId) {
 // 7. Xử lý bộ lọc phòng trọ
 function applyFilters() {
     const selectedSchool = appState.selectedSchool; // { id, name, coords, address }
-    const selectedDistance = document.getElementById('filter-distance').value;
-    const minPrice = parseInt(document.getElementById('filter-price-min').value) || 0;
-    const maxPrice = parseInt(document.getElementById('filter-price-max').value) || Infinity;
-    const selectedOwnerType = document.getElementById('filter-owner').value;
+    const distanceSelect = document.getElementById('filter-distance');
+    const selectedDistance = distanceSelect ? distanceSelect.value : 'all';
+    
+    // Đọc khoảng giá (Hỗ trợ cả nhập số triệu kiểu 1.5, 2, 3 và nhập đầy đủ 1500000, 2000000)
+    const rawMin = parseFloat(document.getElementById('filter-price-min') ? document.getElementById('filter-price-min').value : '');
+    const rawMax = parseFloat(document.getElementById('filter-price-max') ? document.getElementById('filter-price-max').value : '');
+
+    let minPrice = 0;
+    if (!isNaN(rawMin)) {
+        minPrice = rawMin < 1000 ? rawMin * 1000000 : rawMin;
+    }
+
+    let maxPrice = Infinity;
+    if (!isNaN(rawMax)) {
+        maxPrice = rawMax < 1000 ? rawMax * 1000000 : rawMax;
+    }
+
+    const ownerSelect = document.getElementById('filter-owner');
+    const selectedOwnerType = ownerSelect ? ownerSelect.value : 'all';
 
     // Lọc danh sách phòng
     const filteredRooms = appState.rooms.filter(room => {
@@ -964,29 +979,21 @@ function applyFilters() {
             return false;
         }
 
-        // Lọc theo đối tượng đăng tin
-        if (selectedOwnerType !== 'all' && room.ownerType !== selectedOwnerType) {
-            return false;
+        // Lọc theo đối tượng đăng tin (Chủ nhà / Môi giới)
+        if (selectedOwnerType !== 'all') {
+            const roomOwner = (room.ownerType || 'owner').toLowerCase();
+            if (roomOwner !== selectedOwnerType.toLowerCase()) {
+                return false;
+            }
         }
 
         // Lọc theo trường Đại học và Khoảng cách động
         if (selectedSchool) {
-            // Kiểm tra xem trường này có sẵn trong danh sách liên kết không
-            let distance = null;
-            const nearbyUniInfo = room.nearbyUnis.find(uni => uni.id === selectedSchool.id);
+            const distance = getDistance(
+                room.coords[0], room.coords[1],
+                selectedSchool.coords[0], selectedSchool.coords[1]
+            );
             
-            if (nearbyUniInfo) {
-                distance = nearbyUniInfo.distance;
-            } else {
-                // Nếu là trường được tìm kiếm mới qua API, tính khoảng cách đường chim bay thực tế!
-                distance = getDistance(
-                    room.coords[0], room.coords[1],
-                    selectedSchool.coords[0], selectedSchool.coords[1]
-                );
-            }
-            
-            // Lọc theo khoảng cách: Nếu chọn bán kính cụ thể thì theo bán kính đó, 
-            // còn nếu chọn "Tất cả khoảng cách" thì giới hạn ngầm 10.0 km để tránh hiển thị phòng xuyên tỉnh thành khác.
             const maxDist = selectedDistance !== 'all' ? parseFloat(selectedDistance) : 10.0;
             if (distance > maxDist) {
                 return false;
@@ -1270,11 +1277,22 @@ function submitScamReport() {
 
 // 11. Các Trình lắng nghe Sự kiện (Event Listeners)
 function initEventListeners() {
-    // Sự kiện thay đổi bộ lọc phòng trọ (Trường đại học được xử lý riêng trong initSchoolAutocomplete)
-    document.getElementById('filter-distance').addEventListener('change', applyFilters);
-    document.getElementById('filter-price-min').addEventListener('input', applyFilters);
-    document.getElementById('filter-price-max').addEventListener('input', applyFilters);
-    document.getElementById('filter-owner').addEventListener('change', applyFilters);
+    // Sự kiện thay đổi bộ lọc phòng trọ
+    const distFilter = document.getElementById('filter-distance');
+    const pMinFilter = document.getElementById('filter-price-min');
+    const pMaxFilter = document.getElementById('filter-price-max');
+    const ownerFilter = document.getElementById('filter-owner');
+
+    if (distFilter) distFilter.addEventListener('change', applyFilters);
+    if (pMinFilter) {
+        pMinFilter.addEventListener('input', applyFilters);
+        pMinFilter.addEventListener('change', applyFilters);
+    }
+    if (pMaxFilter) {
+        pMaxFilter.addEventListener('input', applyFilters);
+        pMaxFilter.addEventListener('change', applyFilters);
+    }
+    if (ownerFilter) ownerFilter.addEventListener('change', applyFilters);
 
     // Sự kiện phân tích tin đăng
     document.getElementById('analyze-btn').addEventListener('click', analyzePost);
