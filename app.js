@@ -877,7 +877,7 @@ function renderRooms(roomsToRender) {
                 <p><i class="fa-solid fa-phone"></i> LH: <strong>${room.contactPhone}</strong> (${room.ownerName})</p>
                 <p><i class="fa-solid fa-location-crosshairs"></i> ${formatAddressToPostMerger(room.address)}</p>
             </div>
-            <button class="btn btn-primary" onclick="selectRoomCard(${room.id})" style="padding: 4px 8px; font-size: 11px; margin-top: 8px; width: 100%; justify-content: center;">
+            <button class="btn btn-primary" onclick="selectRoomCard('${room.id}')" style="padding: 4px 8px; font-size: 11px; margin-top: 8px; width: 100%; justify-content: center;">
                 Xem chi tiết
             </button>
         `;
@@ -919,7 +919,7 @@ function selectRoom(roomId, coords) {
 function highlightRoomCard(roomId) {
     const cards = document.querySelectorAll('.room-card');
     cards.forEach(card => {
-        if (parseInt(card.getAttribute('data-id')) === roomId) {
+        if (String(card.getAttribute('data-id')) === String(roomId)) {
             card.classList.add('active');
             card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } else {
@@ -930,7 +930,7 @@ function highlightRoomCard(roomId) {
 
 // Hàm global để marker popup có thể gọi chọn card
 window.selectRoomCard = function(roomId) {
-    const room = appState.rooms.find(r => r.id === roomId);
+    const room = appState.rooms.find(r => String(r.id) === String(roomId));
     if (room) {
         selectRoom(roomId, room.coords);
         showRoomDetails(room);
