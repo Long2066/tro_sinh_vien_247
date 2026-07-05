@@ -147,16 +147,57 @@ function sendUnauthorized(res) {
     res.end(JSON.stringify({ error: 'Unauthorized. Mã token bảo mật không hợp lệ hoặc thiếu!' }));
 }
 
+// Bộ nhớ tạm lưu danh sách phòng trọ cho môi trường Vercel (Read-only filesystem)
+let inMemoryLandlordRooms = null;
+let inMemoryPendingRooms = null;
+
 // Lấy danh sách phòng trọ do chủ nhà đăng ký
 function getLandlordRooms() {
+    if (inMemoryLandlordRooms !== null) {
+        return inMemoryLandlordRooms;
+    }
     if (fs.existsSync(landlordRoomsPath)) {
         try {
-            return JSON.parse(fs.readFileSync(landlordRoomsPath, 'utf8'));
+            inMemoryLandlordRooms = JSON.parse(fs.readFileSync(landlordRoomsPath, 'utf8'));
+            return inMemoryLandlordRooms;
         } catch (e) {
             console.error("Lỗi đọc landlord_rooms.json:", e.message);
         }
     }
-    return [];
+    inMemoryLandlordRooms = [];
+    return inMemoryLandlordRooms;
+}
+
+function saveLandlordRooms(rooms) {
+    inMemoryLandlordRooms = rooms;
+    try {
+        fs.writeFileSync(landlordRoomsPath, JSON.stringify(rooms, null, 2), 'utf8');
+    } catch (e) {
+        console.warn("[SERVER] Vercel read-only filesystem detected. Updated in-memory landlord rooms state.");
+    }
+}
+
+function getPendingRooms() {
+    if (inMemoryPendingRooms !== null) {
+        return inMemoryPendingRooms;
+    }
+    if (fs.existsSync(pendingRoomsPath)) {
+        try {
+            inMemoryPendingRooms = JSON.parse(fs.readFileSync(pendingRoomsPath, 'utf8'));
+            return inMemoryPendingRooms;
+        } catch (e) {}
+    }
+    inMemoryPendingRooms = [];
+    return inMemoryPendingRooms;
+}
+
+function savePendingRooms(rooms) {
+    inMemoryPendingRooms = rooms;
+    try {
+        fs.writeFileSync(pendingRoomsPath, JSON.stringify(rooms, null, 2), 'utf8');
+    } catch (e) {
+        console.warn("[SERVER] Vercel read-only filesystem detected. Updated in-memory pending rooms state.");
+    }
 }
 
 // Hàm giải mã và lưu hình ảnh Base64
@@ -662,7 +703,7 @@ const server = http.createServer(async (req, res) => {
             };
 
             rooms.push(roomToSave);
-            fs.writeFileSync(landlordRoomsPath, JSON.stringify(rooms, null, 2), 'utf8');
+            saveLandlordRooms(rooms);
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ success: true, room: roomToSave }));
@@ -712,7 +753,7 @@ const server = http.createServer(async (req, res) => {
                 return;
             }
 
-            fs.writeFileSync(landlordRoomsPath, JSON.stringify(rooms, null, 2), 'utf8');
+            saveLandlordRooms(rooms);
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ success: true }));
         } catch (e) {
@@ -797,7 +838,7 @@ const server = http.createServer(async (req, res) => {
             };
 
             pendingRooms.push(pendingRoom);
-            fs.writeFileSync(pendingRoomsPath, JSON.stringify(pendingRooms, null, 2), 'utf8');
+            savePendingRooms(pendingRooms);
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ success: true, message: 'Đăng tin thành công! Tin đăng của bạn đang chờ Admin kiểm duyệt.' }));
@@ -861,11 +902,11 @@ const server = http.createServer(async (req, res) => {
             };
 
             landlordRooms.push(approvedRoom);
-            fs.writeFileSync(landlordRoomsPath, JSON.stringify(landlordRooms, null, 2), 'utf8');
+            saveLandlordRooms(landlordRooms);
 
             // Xóa khỏi hàng đợi duyệt
             pendingRooms.splice(roomIndex, 1);
-            fs.writeFileSync(pendingRoomsPath, JSON.stringify(pendingRooms, null, 2), 'utf8');
+            savePendingRooms(pendingRooms);
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ success: true, room: approvedRoom }));
@@ -919,7 +960,7 @@ const server = http.createServer(async (req, res) => {
 
             // Xóa khỏi hàng đợi duyệt
             pendingRooms.splice(roomIndex, 1);
-            fs.writeFileSync(pendingRoomsPath, JSON.stringify(pendingRooms, null, 2), 'utf8');
+            savePendingRooms(pendingRooms);
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ success: true }));
