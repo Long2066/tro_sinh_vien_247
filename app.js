@@ -813,16 +813,20 @@ function renderRooms(roomsToRender) {
             
             ${tagsHTML}
 
-            <div class="room-details" style="margin-top: 10px;">
+            <div class="room-details" style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
                 <div class="room-rating">
                     <i class="fa-solid fa-star"></i>
                     <span>${room.rating}</span>
                 </div>
-                <div style="display: flex; gap: 12px; align-items: center;">
-                    <div>Đăng bởi: <strong>${room.ownerName}</strong></div>
-                    <span class="btn-view-detail" style="color: var(--color-primary); font-weight: 600; text-decoration: underline; font-size: 12px; cursor: pointer;">Xem chi tiết</span>
+                <div style="font-size: 12px; color: var(--text-secondary);">
+                    Đăng bởi: <strong>${room.ownerName}</strong>
                 </div>
             </div>
+
+            <!-- Nút bấm to rõ ràng hỗ trợ di động tốt hơn -->
+            <button class="btn-view-detail" style="margin-top: 12px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12.5px; font-weight: 600; padding: 10px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25); color: #60a5fa; border-radius: 8px; cursor: pointer;">
+                <i class="fa-solid fa-circle-info"></i> Xem Chi Tiết Phòng Trọ
+            </button>
         `;
 
         // Click vào card để định vị bản đồ và làm nổi bật
@@ -830,13 +834,16 @@ function renderRooms(roomsToRender) {
             selectRoom(room.id, room.coords);
         });
 
-        // Click vào Xem chi tiết trên card
+        // Click vào Xem chi tiết trên card (Hỗ trợ cả click và touch di động)
         const viewDetailBtn = card.querySelector('.btn-view-detail');
-        viewDetailBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Ngăn sự kiện click của card cha
+        const handleDetailOpen = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             selectRoom(room.id, room.coords);
             showRoomDetails(room);
-        });
+        };
+        viewDetailBtn.addEventListener('click', handleDetailOpen);
+        viewDetailBtn.addEventListener('touchend', handleDetailOpen);
 
         listContainer.appendChild(card);
 
