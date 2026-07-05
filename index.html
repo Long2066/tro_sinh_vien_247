@@ -43,6 +43,15 @@
         
         <!-- Sidebar bên trái (Lọc, Danh sách & Phân tích) -->
         <aside class="sidebar" id="sidebar">
+            <!-- Thanh điều khiển di động thu/phóng bản đồ -->
+            <div class="sidebar-mobile-header" id="sidebar-mobile-header">
+                <span class="sheet-title"><i class="fa-solid fa-layer-group"></i> Thông Tin & Chức Năng</span>
+                <button class="sheet-toggle-btn" id="sheet-toggle-btn" type="button">
+                    <i class="fa-solid fa-compress" id="sheet-toggle-icon"></i>
+                    <span id="sheet-toggle-text">Ẩn Bản Đồ (Toàn Màn Hình)</span>
+                </button>
+            </div>
+
             <nav class="tab-nav">
                 <button class="tab-btn active" data-tab="find-rooms" style="padding: 10px 4px;">
                     <i class="fa-solid fa-map-location-dot"></i>
@@ -203,7 +212,7 @@
                         </h4>
                     </div>
 
-                    <div class="roommate-list-container" id="roommate-list" style="display: flex; flex-direction: column; gap: 12px; overflow-y: auto; max-height: calc(100vh - 430px); padding-right: 4px;">
+                    <div class="roommate-list-container" id="roommate-list" style="display: flex; flex-direction: column; gap: 12px; padding-right: 4px;">
                         <!-- Render động từ app.js -->
                     </div>
                 </div>

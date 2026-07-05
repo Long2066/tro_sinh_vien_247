@@ -1152,16 +1152,28 @@ function initEventListeners() {
         }
     });
 
-    // Sự kiện toggle Bản đồ/Danh sách trên Mobile
+    // Sự kiện toggle Bản đồ/Danh sách trên Mobile (Nút nổi)
     const mobileToggleBtn = document.getElementById('mobile-map-toggle');
     mobileToggleBtn.addEventListener('click', () => {
         const sidebar = document.getElementById('sidebar');
+        const container = document.querySelector('.app-container');
+        const sheetBtnText = document.getElementById('sheet-toggle-text');
+        const sheetBtnIcon = document.getElementById('sheet-toggle-icon');
+
         if (appState.isMapVisibleOnMobile) {
+            // Xem Danh Sách (Split screen default)
             sidebar.classList.remove('hidden');
+            container.classList.remove('map-collapsed');
+            if (sheetBtnText) sheetBtnText.textContent = "Ẩn Bản Đồ";
+            if (sheetBtnIcon) {
+                sheetBtnIcon.className = "fa-solid fa-compress";
+            }
             mobileToggleBtn.innerHTML = '<i class="fa-solid fa-map"></i> Xem bản đồ';
             appState.isMapVisibleOnMobile = false;
         } else {
+            // Xem Bản Đồ (Ẩn danh sách hoàn toàn)
             sidebar.classList.add('hidden');
+            container.classList.remove('map-collapsed');
             mobileToggleBtn.innerHTML = '<i class="fa-solid fa-list"></i> Xem danh sách';
             appState.isMapVisibleOnMobile = true;
         }
@@ -1169,6 +1181,36 @@ function initEventListeners() {
         // Hồi phục lại map render
         setTimeout(() => appState.map.invalidateSize(), 300);
     });
+
+    // Sự kiện Thu gọn / Mở rộng Bản đồ hoàn toàn từ thanh Header của Bottom Sheet
+    const sheetToggleBtn = document.getElementById('sheet-toggle-btn');
+    if (sheetToggleBtn) {
+        sheetToggleBtn.addEventListener('click', () => {
+            const container = document.querySelector('.app-container');
+            const sheetBtnText = document.getElementById('sheet-toggle-text');
+            const sheetBtnIcon = document.getElementById('sheet-toggle-icon');
+
+            container.classList.toggle('map-collapsed');
+
+            if (container.classList.contains('map-collapsed')) {
+                // Đang thu gọn bản đồ (Xem toàn màn hình danh sách)
+                if (sheetBtnText) sheetBtnText.textContent = "Hiện Bản Đồ";
+                if (sheetBtnIcon) {
+                    sheetBtnIcon.className = "fa-solid fa-expand";
+                }
+            } else {
+                // Đang mở rộng bản đồ (Chế độ split screen)
+                if (sheetBtnText) sheetBtnText.textContent = "Ẩn Bản Đồ";
+                if (sheetBtnIcon) {
+                    sheetBtnIcon.className = "fa-solid fa-compress";
+                }
+                // Hồi phục map render
+                if (appState.map) {
+                    setTimeout(() => appState.map.invalidateSize(), 100);
+                }
+            }
+        });
+    }
 }
 
 // Mở modal báo cáo
