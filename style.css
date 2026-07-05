@@ -1063,6 +1063,53 @@ select:focus, input:focus, textarea:focus {
 }
 
 @media (max-width: 768px) {
+    /* Header Siêu Gọn 1 Dòng (Compact Single-Row Header) */
+    header {
+        height: 52px !important;
+        padding: 0 12px !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        gap: 0 !important;
+        background: rgba(11, 15, 25, 0.95) !important;
+    }
+
+    /* Ẩn triệt để khẩu hiệu ở giữa trên di động */
+    .hide-mobile,
+    header .header-actions div.hide-mobile {
+        display: none !important;
+    }
+
+    .logo-container {
+        gap: 6px !important;
+    }
+
+    .logo-icon {
+        font-size: 20px !important;
+    }
+
+    .logo-text {
+        font-size: 15px !important;
+    }
+
+    .header-actions {
+        width: auto !important;
+        gap: 8px !important;
+    }
+
+    .header-actions .btn {
+        min-height: 34px !important;
+        padding: 6px 10px !important;
+        font-size: 12px !important;
+        border-radius: 18px !important;
+        white-space: nowrap !important;
+        flex: none !important;
+    }
+
+    .app-container {
+        height: calc(100vh - 52px) !important;
+    }
+
     /* Ngăn iOS Safari tự động phóng to (Auto-zoom) khi nhấp vào ô input */
     input[type="text"],
     input[type="number"],
@@ -1072,19 +1119,6 @@ select:focus, input:focus, textarea:focus {
         font-size: 16px !important;
     }
     
-    /* Tối ưu hóa Touch Targets trên Mobile */
-    .btn, 
-    .tab-btn, 
-    .filter-btn,
-    .roommate-phone-btn,
-    .mobile-toggle .btn {
-        min-height: 44px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 10px 16px;
-    }
-
     /* Bố cục bộ lọc tìm kiếm di động */
     .search-filter-section {
         padding: 12px;
@@ -1117,37 +1151,21 @@ select:focus, input:focus, textarea:focus {
 }
 
 @media (max-width: 480px) {
-    /* Header di động thu nhỏ */
-    header {
-        padding: 10px 12px;
-        height: auto;
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .header-actions {
-        width: 100%;
-        justify-content: center;
-        gap: 10px;
-    }
-    
-    .header-actions button,
-    .header-actions a {
-        flex: 1;
-        justify-content: center;
-    }
-    
     .logo-text {
-        font-size: 18px;
+        font-size: 13.5px !important;
     }
 
-    /* Điều chỉnh lại layout container do header cao hơn */
-    .app-container {
-        height: calc(100vh - 90px);
+    .header-actions .btn {
+        padding: 5px 8px !important;
+        font-size: 11px !important;
+    }
+
+    .header-actions .btn i {
+        font-size: 11px !important;
     }
     
     .sidebar {
-        height: 55% !important;
+        height: 60% !important;
     }
 }
 
