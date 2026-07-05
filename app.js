@@ -1556,7 +1556,14 @@ function showRoomDetails(room) {
     };
 
     // Open the modal
-    document.getElementById('room-details-modal').style.display = 'flex';
+    const modal = document.getElementById('room-details-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        const modalBody = modal.querySelector('.modal-body');
+        if (modalBody) {
+            modalBody.scrollTop = 0;
+        }
+    }
 }
 
 // Đóng modal chi tiết phòng trọ
