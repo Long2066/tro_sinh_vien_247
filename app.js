@@ -495,7 +495,7 @@ function formatAddressToPostMerger(address) {
         cleanParts.push(newWard);
     }
 
-    if (address.includes("Tuyên Quang") || address.includes("Hà Giang")) {
+    if ((address.includes("Tuyên Quang") || address.includes("Hà Giang")) && !address.includes("Thái Nguyên")) {
         cleanParts.push("Tuyên Quang");
     }
 

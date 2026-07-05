@@ -223,18 +223,18 @@ const UNIVERSITIES = [
 
     // --- THÁI NGUYÊN & HÀ GIANG ---
     {
-        id: "tnu-hg",
-        name: "Phân hiệu Đại học Thái Nguyên tại Hà Giang",
-        abbr: "TNU-HG",
-        coords: [22.8123623, 104.9814349],
-        address: "Đường Nguyễn Du, Tổ 16, Phường Nguyễn Trãi, Thành phố Hà Giang, Tỉnh Hà Giang"
-    },
-    {
         id: "tnu",
         name: "Đại học Thái Nguyên (Trụ sở chính)",
         abbr: "TNU",
         coords: [21.5875, 105.8115],
         address: "Phường Tân Thịnh, Thành phố Thái Nguyên, Tỉnh Thái Nguyên"
+    },
+    {
+        id: "tnu-hg",
+        name: "Phân hiệu Đại học Thái Nguyên tại Hà Giang",
+        abbr: "TNU-HG",
+        coords: [22.8123623, 104.9814349],
+        address: "Đường Nguyễn Du, Tổ 16, Phường Nguyễn Trãi, Thành phố Hà Giang, Tỉnh Hà Giang"
     },
     {
         id: "tnut",
