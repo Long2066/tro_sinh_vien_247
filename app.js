@@ -323,6 +323,15 @@ function selectSchool(school) {
     }
     document.getElementById('clear-uni-btn').style.display = 'block';
 
+    // Reset bộ lọc Tỉnh/Thành và Phường/Xã để tránh xung đột vị trí trường mới chọn
+    const provSelect = document.getElementById('filter-province');
+    const wardSelect = document.getElementById('filter-ward');
+    if (provSelect) provSelect.value = '';
+    if (wardSelect) {
+        wardSelect.innerHTML = '<option value="">-- Tất cả Phường/Xã --</option>';
+        wardSelect.value = '';
+    }
+
     // XÓA LẬP TỨC tin trọ cũ, thay bằng danh sách thuộc khu vực trường mới chọn
     appState.rooms = getRoomsForLocation(school.coords[0], school.coords[1], school.id);
 
@@ -586,12 +595,20 @@ function fetchRealRooms(lat, lon, schoolId) {
             return res.json();
         })
         .then(realRooms => {
+            const localMockRooms = getRoomsForLocation(lat, lon, schoolId);
             if (realRooms && realRooms.length > 0) {
                 console.log(`[LIVE DATA] Đã tải ${realRooms.length} tin thật từ Chợ Tốt.`);
-                appState.rooms = realRooms;
+                const combined = [...localMockRooms];
+                realRooms.forEach(realRoom => {
+                    const exists = combined.some(mockRoom => mockRoom.title === realRoom.title);
+                    if (!exists) {
+                        combined.push(realRoom);
+                    }
+                });
+                appState.rooms = combined;
                 showToast(`Đã đồng bộ ${realRooms.length} phòng trọ thực tế!`, false);
             } else {
-                throw new Error("Không có dữ liệu tin đăng thật");
+                appState.rooms = localMockRooms;
             }
         })
         .catch(err => {
@@ -611,7 +628,7 @@ function getRoomsForLocation(lat, lon, schoolId) {
     // 1. Kiểm tra xem trong MOCK_ROOMS có phòng nào nằm trong vòng 15km quanh trường không
     const nearby = MOCK_ROOMS.filter(room => {
         const d = getDistance(room.coords[0], room.coords[1], lat, lon);
-        return d <= 15.0;
+        return d <= 10.0;
     });
 
     if (nearby.length > 0) {
