@@ -150,6 +150,17 @@ function initSchoolAutocomplete() {
         const query = input.value.trim();
         clearBtn.style.display = query !== '' ? 'block' : 'none';
 
+        // Tạm thời ẩn các ghim/phòng cũ khi người dùng bắt đầu nhập tìm kiếm mới
+        if (query !== '') {
+            appState.selectedSchool = null;
+            appState.rooms = [];
+            renderRooms([]);
+            if (appState.uniMarker) {
+                appState.map.removeLayer(appState.uniMarker);
+                appState.uniMarker = null;
+            }
+        }
+
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
             if (query === '') {
@@ -571,15 +582,7 @@ function fetchRealRooms(lat, lon, schoolId) {
         .then(realRooms => {
             if (realRooms && realRooms.length > 0) {
                 console.log(`[LIVE DATA] Đã tải ${realRooms.length} tin thật từ Chợ Tốt.`);
-                // Hợp nhất tin thật với tin mẫu offline, loại bỏ tin trùng lặp tiêu đề
-                const combined = [...MOCK_ROOMS];
-                realRooms.forEach(realRoom => {
-                    const exists = combined.some(mockRoom => mockRoom.title === realRoom.title);
-                    if (!exists) {
-                        combined.push(realRoom);
-                    }
-                });
-                appState.rooms = combined;
+                appState.rooms = realRooms;
                 showToast(`Đã đồng bộ ${realRooms.length} phòng trọ thực tế!`, false);
             } else {
                 throw new Error("Không có dữ liệu tin đăng thật");
