@@ -332,6 +332,12 @@ function selectSchool(school) {
         wardSelect.value = '';
     }
 
+    // Đồng bộ bộ lọc trường bên góc ở ghép
+    const rmSchoolFilter = document.getElementById('rm-filter-school');
+    if (rmSchoolFilter) {
+        rmSchoolFilter.value = school.id;
+    }
+
     // XÓA LẬP TỨC tin trọ cũ, thay bằng danh sách thuộc khu vực trường mới chọn
     appState.rooms = getRoomsForLocation(school.coords[0], school.coords[1], school.id);
 
@@ -1919,7 +1925,25 @@ function initRoommates() {
     // 1. Tải danh sách từ API
     fetchRoommates();
 
-    // 2. Thiết lập lắng nghe sự thay đổi của bộ lọc nhanh thói quen sinh hoạt
+    // 2. Nạp dữ liệu các trường vào ô chọn lọc ở ghép
+    const rmSchoolFilterSelect = document.getElementById('rm-filter-school');
+    if (rmSchoolFilterSelect) {
+        rmSchoolFilterSelect.innerHTML = '<option value="all">Tất cả các Trường / Khu vực</option>';
+        UNIVERSITIES.forEach(uni => {
+            const opt = document.createElement('option');
+            opt.value = uni.id;
+            opt.textContent = `${uni.name} (${uni.abbr})`;
+            rmSchoolFilterSelect.appendChild(opt);
+        });
+        rmSchoolFilterSelect.addEventListener('change', renderRoommates);
+        
+        // Chọn sẵn trường hiện tại nếu có
+        if (appState.selectedSchool) {
+            rmSchoolFilterSelect.value = appState.selectedSchool.id;
+        }
+    }
+
+    // 3. Thiết lập lắng nghe sự thay đổi của bộ lọc nhanh thói quen sinh hoạt
     const myGender = document.getElementById('my-gender');
     const mySmoking = document.getElementById('my-smoking');
     const mySleep = document.getElementById('my-sleep');
@@ -2034,9 +2058,18 @@ function calculateMatchScore(myFilters, rmProfile) {
     }
 
     // 2. Khớp trường học (School Match) - Trọng số: 30%
-    if (appState.selectedSchool && appState.selectedSchool.id === rmProfile.uniId) {
-        score += 30;
-    } else if (!appState.selectedSchool) {
+    const rmSchoolFilter = document.getElementById('rm-filter-school');
+    const filterUniId = rmSchoolFilter ? rmSchoolFilter.value : 'all';
+    
+    if (filterUniId !== 'all') {
+        if (rmProfile.uniId === filterUniId) {
+            score += 30;
+        }
+    } else if (appState.selectedSchool) {
+        if (appState.selectedSchool.id === rmProfile.uniId) {
+            score += 30;
+        }
+    } else {
         score += 20; // Nếu không chọn trường cụ thể, cho điểm cơ sở
     }
 
@@ -2063,6 +2096,16 @@ function renderRoommates() {
     const countSpan = document.getElementById('roommates-count');
     if (!listContainer) return;
 
+    // Lấy giá trị bộ lọc trường
+    const schoolFilter = document.getElementById('rm-filter-school');
+    const selectedSchoolId = schoolFilter ? schoolFilter.value : 'all';
+
+    // Lọc danh sách roommates theo trường nếu được chọn lọc cụ thể
+    let filteredCandidates = appState.roommates;
+    if (selectedSchoolId !== 'all') {
+        filteredCandidates = filteredCandidates.filter(rm => rm.uniId === selectedSchoolId);
+    }
+
     // Lấy giá trị bộ lọc thói quen nhanh
     const myFilters = {
         gender: document.getElementById('my-gender').value,
@@ -2072,7 +2115,7 @@ function renderRoommates() {
     };
 
     // Chấm điểm cho từng ứng viên
-    const ratedRoommates = appState.roommates.map(rm => {
+    const ratedRoommates = filteredCandidates.map(rm => {
         const score = calculateMatchScore(myFilters, rm);
         return { ...rm, matchScore: score };
     });
@@ -2084,7 +2127,7 @@ function renderRoommates() {
     countSpan.innerText = ratedRoommates.length;
 
     if (ratedRoommates.length === 0) {
-        listContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 13px;">Chưa có bạn sinh viên nào đăng ký tìm ở ghép.</div>';
+        listContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 13px;">Không có bạn sinh viên nào tìm ở ghép ở khu vực trường này.</div>';
         return;
     }
 
