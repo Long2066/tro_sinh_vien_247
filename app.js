@@ -549,6 +549,7 @@ function fetchRealRooms(lat, lon, schoolId) {
         .finally(() => {
             // Áp dụng bộ lọc và vẽ marker
             applyFilters();
+        });
 }
 
 // Hàm sinh danh sách phòng trọ cho các trường xa Hà Nội (Đảm bảo khu vực nào cũng có trọ chính xác)
