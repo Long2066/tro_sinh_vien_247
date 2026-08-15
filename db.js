@@ -1,5 +1,8 @@
-// db.js — Module kết nối Firebase Firestore (lưu trữ dữ liệu vĩnh viễn)
-const admin = require('firebase-admin');
+// db.js — Module kết nối Firebase Firestore (Lưu trữ dữ liệu vĩnh viễn)
+const { initializeApp, cert, getApps } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
+const path = require('path');
+const fs = require('fs');
 
 let db = null;
 
@@ -7,22 +10,36 @@ function getDb() {
     if (db) return db;
 
     try {
-        // Ưu tiên biến môi trường FIREBASE_SERVICE_ACCOUNT (Vercel)
-        if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
-            });
-        } else {
-            // Fallback: đọc file firebase-key.json (local development)
-            const path = require('path');
-            const serviceAccount = require(path.join(__dirname, 'firebase-key.json'));
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
-            });
+        if (getApps().length === 0) {
+            let serviceAccount = null;
+            if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+                try {
+                    serviceAccount = typeof process.env.FIREBASE_SERVICE_ACCOUNT === 'string'
+                        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+                        : process.env.FIREBASE_SERVICE_ACCOUNT;
+                } catch (jsonErr) {
+                    console.error('[FIREBASE] Lỗi parse FIREBASE_SERVICE_ACCOUNT:', jsonErr.message);
+                }
+            }
+            
+            if (!serviceAccount) {
+                const keyPath = path.join(__dirname, 'firebase-key.json');
+                if (fs.existsSync(keyPath)) {
+                    serviceAccount = require(keyPath);
+                }
+            }
+
+            if (serviceAccount) {
+                initializeApp({
+                    credential: cert(serviceAccount)
+                });
+            } else {
+                console.error('[FIREBASE] ❌ Không tìm thấy thông tin Service Account!');
+                return null;
+            }
         }
 
-        db = admin.firestore();
+        db = getFirestore();
         console.log('[FIREBASE] ✅ Kết nối Firestore thành công!');
         return db;
     } catch (e) {
@@ -39,6 +56,7 @@ async function getFirestoreLandlordRooms() {
 
     try {
         const snapshot = await firestore.collection('landlord_rooms').get();
+        if (snapshot.empty) return [];
         return snapshot.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
     } catch (e) {
         console.error('[FIREBASE] Lỗi đọc landlord_rooms:', e.message);
@@ -51,8 +69,8 @@ async function addFirestoreLandlordRoom(room) {
     if (!firestore) return false;
 
     try {
-        await firestore.collection('landlord_rooms').doc(room.id).set(room);
-        console.log(`[FIREBASE] ✅ Đã lưu phòng trọ: ${room.id}`);
+        await firestore.collection('landlord_rooms').doc(String(room.id)).set(room);
+        console.log(`[FIREBASE] ✅ Đã lưu vĩnh viễn phòng trọ: ${room.id}`);
         return true;
     } catch (e) {
         console.error('[FIREBASE] Lỗi ghi landlord_rooms:', e.message);
@@ -65,12 +83,10 @@ async function deleteFirestoreLandlordRoom(roomId) {
     if (!firestore) return false;
 
     try {
-        // Tìm document theo field id
         const snapshot = await firestore.collection('landlord_rooms')
-            .where('id', '==', roomId).get();
+            .where('id', '==', String(roomId)).get();
         if (snapshot.empty) {
-            // Thử xóa theo doc ID
-            await firestore.collection('landlord_rooms').doc(roomId).delete();
+            await firestore.collection('landlord_rooms').doc(String(roomId)).delete();
         } else {
             const batch = firestore.batch();
             snapshot.forEach(doc => batch.delete(doc.ref));
@@ -110,8 +126,8 @@ async function addFirestorePendingRoom(room) {
     if (!firestore) return false;
 
     try {
-        await firestore.collection('pending_rooms').doc(room.id).set(room);
-        console.log(`[FIREBASE] ✅ Đã lưu tin chờ duyệt: ${room.id}`);
+        await firestore.collection('pending_rooms').doc(String(room.id)).set(room);
+        console.log(`[FIREBASE] ✅ Đã lưu vĩnh viễn tin chờ duyệt: ${room.id}`);
         return true;
     } catch (e) {
         console.error('[FIREBASE] Lỗi ghi pending_rooms:', e.message);
@@ -125,9 +141,9 @@ async function deleteFirestorePendingRoom(roomId) {
 
     try {
         const snapshot = await firestore.collection('pending_rooms')
-            .where('id', '==', roomId).get();
+            .where('id', '==', String(roomId)).get();
         if (snapshot.empty) {
-            await firestore.collection('pending_rooms').doc(roomId).delete();
+            await firestore.collection('pending_rooms').doc(String(roomId)).delete();
         } else {
             const batch = firestore.batch();
             snapshot.forEach(doc => batch.delete(doc.ref));
@@ -190,7 +206,7 @@ async function addFirestoreRoommate(profile) {
     if (!firestore) return false;
 
     try {
-        await firestore.collection('roommates').doc(profile.id).set(profile);
+        await firestore.collection('roommates').doc(String(profile.id)).set(profile);
         return true;
     } catch (e) {
         console.error('[FIREBASE] Lỗi ghi roommates:', e.message);
@@ -204,9 +220,9 @@ async function deleteFirestoreRoommate(profileId) {
 
     try {
         const snapshot = await firestore.collection('roommates')
-            .where('id', '==', profileId).get();
+            .where('id', '==', String(profileId)).get();
         if (snapshot.empty) {
-            await firestore.collection('roommates').doc(profileId).delete();
+            await firestore.collection('roommates').doc(String(profileId)).delete();
         } else {
             const batch = firestore.batch();
             snapshot.forEach(doc => batch.delete(doc.ref));

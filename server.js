@@ -674,6 +674,12 @@ const requestHandler = async (req, res) => {
     const parsedUrl = url.parse(req.url, true);
     const pathname = parsedUrl.pathname;
 
+    if (pathname.startsWith('/api/')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+    }
+
     // Ghi nhận lượt truy cập real-time
     trackVisit(req, pathname, parsedUrl.query);
 

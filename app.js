@@ -33,6 +33,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (UNIVERSITIES && UNIVERSITIES.length > 0) {
         selectSchool(UNIVERSITIES[0]);
     }
+
+    // Tự động đồng bộ thời gian thực mỗi 6 giây (Điện thoại & Laptop luôn khớp dữ liệu chuẩn không cần F5)
+    setInterval(() => {
+        if (appState.selectedSchool) {
+            fetchRealRooms(appState.selectedSchool.coords[0], appState.selectedSchool.coords[1], appState.selectedSchool.id);
+        }
+    }, 6000);
 });
 
 // 1. Khởi tạo dữ liệu (từ LocalStorage hoặc dùng dữ liệu mẫu ban đầu)
@@ -723,22 +730,19 @@ function formatAddressToPostMerger(address) {
     return formatted;
 }
 
-// 4.1. Fetch danh sách phòng trọ thực tế từ Local Server API (Chợ Tốt)
+// 4.1. Fetch danh sách phòng trọ thực tế từ Local Server API (Chợ Tốt + Firestore)
 function fetchRealRooms(lat, lon, schoolId) {
     const provinceCode = document.getElementById('filter-province') ? document.getElementById('filter-province').value : '';
     const wardCode = document.getElementById('filter-ward') ? document.getElementById('filter-ward').value : '';
-    let serverUrl = `/api/rooms?lat=${lat}&lon=${lon}&distance=10`;
+    let serverUrl = `/api/rooms?lat=${lat}&lon=${lon}&distance=10&_t=${Date.now()}`;
     if (provinceCode) serverUrl += `&provinceCode=${encodeURIComponent(provinceCode)}`;
     if (wardCode) serverUrl += `&wardCode=${encodeURIComponent(wardCode)}`;
 
-    // Luôn render dữ liệu khu vực trước để trên điện thoại không bị kẹt ở màn hình chờ API.
     const localMockRooms = getRoomsForLocation(lat, lon, schoolId);
-    appState.rooms = localMockRooms;
-    applyFilters();
 
     const syncController = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timeoutId = syncController ? setTimeout(() => syncController.abort(), 15000) : null;
-    const fetchOptions = syncController ? { signal: syncController.signal } : {};
+    const fetchOptions = syncController ? { signal: syncController.signal, cache: 'no-store' } : { cache: 'no-store' };
 
     return fetch(serverUrl, fetchOptions)
         .then(res => {
@@ -758,7 +762,6 @@ function fetchRealRooms(lat, lon, schoolId) {
                 ? 'API phản hồi chậm'
                 : err.message;
             console.warn("Giữ dữ liệu phòng trọ mặc định.", reason);
-            appState.rooms = localMockRooms;
         })
         .finally(() => {
             if (timeoutId) clearTimeout(timeoutId);
