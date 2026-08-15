@@ -1108,19 +1108,20 @@ const requestHandler = async (req, res) => {
             }
 
             let rooms = await getLandlordRooms();
-            const originalLength = rooms.length;
-            
-            // Xóa file ảnh vật lý trước khi xóa khỏi json
-            const roomToDelete = rooms.find(r => r.id === roomId);
+            const roomToDelete = rooms.find(r => String(r.id) === String(roomId) || String(r._docId) === String(roomId));
+
+            // Xóa file ảnh vật lý nếu có
             if (roomToDelete && Array.isArray(roomToDelete.images)) {
                 roomToDelete.images.forEach(imgUrl => {
                     try {
-                        const parts = imgUrl.split('/');
-                        const filename = parts[parts.length - 1];
-                        const filepath = path.join(uploadsDir, filename);
-                        if (fs.existsSync(filepath)) {
-                            fs.unlinkSync(filepath);
-                            console.log(`[SERVER] Đã xóa file ảnh vật lý: ${filename}`);
+                        if (typeof imgUrl === 'string' && imgUrl.startsWith('/uploads/')) {
+                            const parts = imgUrl.split('/');
+                            const filename = parts[parts.length - 1];
+                            const filepath = path.join(uploadsDir, filename);
+                            if (fs.existsSync(filepath)) {
+                                fs.unlinkSync(filepath);
+                                console.log(`[SERVER] Đã xóa file ảnh vật lý: ${filename}`);
+                            }
                         }
                     } catch (err) {
                         console.error("Lỗi khi xóa file ảnh vật lý:", err.message);
@@ -1128,15 +1129,11 @@ const requestHandler = async (req, res) => {
                 });
             }
 
-            if (!roomToDelete) {
-                res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(JSON.stringify({ error: 'Không tìm thấy phòng trọ với ID tương ứng!' }));
-                return;
-            }
-
+            // Luôn gọi lệnh xóa vĩnh viễn khỏi Firestore & RAM cache
             await deleteLandlordRoom(roomId);
+
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ success: true }));
+            res.end(JSON.stringify({ success: true, message: 'Đã xóa phòng trọ thành công!' }));
         } catch (e) {
             res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ error: 'Lỗi xóa phòng trọ', details: e.message }));
