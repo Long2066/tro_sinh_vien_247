@@ -488,7 +488,8 @@ function trackVisit(req, pathname, query = {}) {
     }
 
     const now = Date.now();
-    const todayStr = new Date().toISOString().split('T')[0];
+    const nowDate = new Date(now);
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(nowDate);
     const clientIp = getClientIp(req);
     const userAgent = req.headers['user-agent'] || '';
     const device = parseUserAgent(userAgent);
@@ -528,7 +529,7 @@ function trackVisit(req, pathname, query = {}) {
         actionDetail = 'Tra cứu danh sách lừa đảo';
     }
 
-    const timeStr = new Date().toLocaleTimeString('vi-VN');
+    const timeStr = nowDate.toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
     inMemoryStats.recentVisits.unshift({
         id: 'v-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
         time: timeStr,
@@ -929,7 +930,7 @@ const requestHandler = async (req, res) => {
         const onlineUsersCount = Object.values(inMemoryStats.activeSessions)
             .filter(t => t >= fiveMinsAgo).length;
 
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
         const todayVisitsCount = inMemoryStats.dailyVisits[todayStr] || 0;
         const tnuHgSearches = inMemoryStats.uniSearches['tnu-hg'] || 0;
 
