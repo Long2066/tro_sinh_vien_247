@@ -967,7 +967,7 @@ const requestHandler = async (req, res) => {
             const body = await getRequestBody(req);
             const newRoom = JSON.parse(body);
             
-            if (!newRoom.title || !newRoom.price || !newRoom.contactPhone || !newRoom.coords || !newRoom.address) {
+            if (!newRoom.title || newRoom.price === undefined || newRoom.price === null || !newRoom.contactPhone || !newRoom.coords || !newRoom.address) {
                 res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ error: 'Thiếu các thông tin bắt buộc!' }));
                 return;
@@ -976,7 +976,7 @@ const requestHandler = async (req, res) => {
             // Lưu các hình ảnh tải lên nếu có
             const savedImageUrls = [];
             if (Array.isArray(newRoom.images)) {
-                newRoom.images.slice(0, 4).forEach((base64Str, idx) => {
+                newRoom.images.forEach((base64Str, idx) => {
                     const imgUrl = saveBase64Image(base64Str, idx);
                     if (imgUrl) {
                         savedImageUrls.push(imgUrl);
@@ -1078,7 +1078,7 @@ const requestHandler = async (req, res) => {
             const body = await getRequestBody(req);
             const newRoom = JSON.parse(body);
 
-            if (!newRoom.title || !newRoom.price || !newRoom.contactPhone || !newRoom.coords || !newRoom.address) {
+            if (!newRoom.title || newRoom.price === undefined || newRoom.price === null || !newRoom.contactPhone || !newRoom.coords || !newRoom.address) {
                 res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ error: 'Thiếu các thông tin bắt buộc!' }));
                 return;
@@ -1097,7 +1097,7 @@ const requestHandler = async (req, res) => {
             // Lưu các hình ảnh phòng trọ tải lên nếu có
             const savedImageUrls = [];
             if (Array.isArray(newRoom.images)) {
-                newRoom.images.slice(0, 4).forEach((base64Str, idx) => {
+                newRoom.images.forEach((base64Str, idx) => {
                     const imgUrl = saveBase64Image(base64Str, idx);
                     if (imgUrl) {
                         savedImageUrls.push(imgUrl);

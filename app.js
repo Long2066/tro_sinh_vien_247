@@ -1792,13 +1792,6 @@ function closePostModal() {
 // Xử lý sự kiện chọn file hình ảnh của người dùng
 function handlePostImageSelect(e) {
     const files = Array.from(e.target.files);
-    
-    if (appState.selectedPostImages.length + files.length > 4) {
-        showToast("Tối đa chỉ được chọn 4 hình ảnh phòng!", true);
-        const spaceLeft = 4 - appState.selectedPostImages.length;
-        files.splice(spaceLeft);
-    }
-
     let loadedCount = 0;
     if (files.length === 0) return;
 
@@ -1836,7 +1829,7 @@ function renderPostImagePreviews() {
     const statusLabel = document.getElementById('post-upload-status');
     container.innerHTML = '';
 
-    statusLabel.textContent = `Đã chọn ${appState.selectedPostImages.length}/4 ảnh`;
+    statusLabel.textContent = `Đã chọn ${appState.selectedPostImages.length} ảnh`;
 
     appState.selectedPostImages.forEach((base64Str, index) => {
         const wrapper = document.createElement('div');
@@ -1892,18 +1885,57 @@ async function submitPostRoom() {
     const phone = document.getElementById('post-phone').value.trim();
     const ownerName = document.getElementById('post-owner-name').value.trim();
     const address = document.getElementById('post-address').value.trim();
-    const lat = document.getElementById('post-lat').value.trim();
-    const lon = document.getElementById('post-lon').value.trim();
+    let latRaw = document.getElementById('post-lat').value.trim();
+    let lonRaw = document.getElementById('post-lon').value.trim();
     const description = document.getElementById('post-desc').value.trim();
 
-    if (!title || (!isContactPrice && !priceRaw) || !phone || !ownerName || !address || !lat || !lon) {
-        showToast("Vui lòng điền đầy đủ các thông tin có dấu (*)", true);
+    // 1. Kiểm tra từng trường thông tin và hiển thị thông báo chính xác
+    if (!title) {
+        showToast("Vui lòng nhập Tiêu đề tin đăng!", true);
+        return;
+    }
+    if (!isContactPrice && (!priceRaw || isNaN(priceVal) || priceVal < 0)) {
+        showToast("Vui lòng nhập Giá thuê hợp lệ hoặc chọn 'LH Chủ Nhà để nhận báo giá'!", true);
+        return;
+    }
+    if (!phone) {
+        showToast("Vui lòng nhập Số điện thoại liên hệ!", true);
+        return;
+    }
+    if (!ownerName) {
+        showToast("Vui lòng nhập Tên người liên hệ!", true);
+        return;
+    }
+    if (!address) {
+        showToast("Vui lòng nhập Địa chỉ chi tiết phòng trọ!", true);
         return;
     }
 
-    if (appState.selectedPostImages.length === 0) {
-        showToast("Vui lòng tải lên ít nhất 1 ảnh phòng trọ!", true);
-        return;
+    // 2. Tự động xử lý bổ sung Tọa độ nếu chưa ghim bản đồ (tránh bị lỗi chặn form)
+    let finalCoords = [22.823853, 104.969584]; // Tọa độ mặc định Hà Giang
+    if (latRaw && lonRaw && !isNaN(parseFloat(latRaw)) && !isNaN(parseFloat(lonRaw))) {
+        finalCoords = [parseFloat(latRaw), parseFloat(lonRaw)];
+    } else {
+        try {
+            const cleanedQuery = cleanAddressForGeocoding(address) || address;
+            const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanedQuery + ', Vietnam')}&format=json&limit=1`, {
+                headers: { 'User-Agent': 'SmartRoomFinder/1.0' }
+            });
+            if (geoRes.ok) {
+                const geoData = await geoRes.json();
+                if (geoData && geoData.length > 0) {
+                    finalCoords = [parseFloat(geoData[0].lat), parseFloat(geoData[0].lon)];
+                }
+            }
+        } catch (e) {
+            console.log("Dùng tọa độ mặc định thành phố.");
+        }
+    }
+
+    // 3. Xử lý ảnh: Không bắt buộc ảnh (dùng ảnh mặc định nếu không tải ảnh nào)
+    let images = [...appState.selectedPostImages];
+    if (images.length === 0) {
+        images = ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=600&q=80"];
     }
 
     const amenities = [];
@@ -1918,10 +1950,10 @@ async function submitPostRoom() {
         contactPhone: phone,
         ownerName: ownerName,
         address: address,
-        coords: [parseFloat(lat), parseFloat(lon)],
+        coords: finalCoords,
         amenities: amenities,
         description: description,
-        images: appState.selectedPostImages,
+        images: images,
         userCoords: appState.userCoords
     };
 
