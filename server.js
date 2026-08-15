@@ -761,25 +761,26 @@ const requestHandler = async (req, res) => {
             console.error("[ERROR] Lỗi gọi API Chợ Tốt:", error.message);
         }
 
-        // B. Nạp thêm tin cào từ Facebook (nếu có trong khoảng bán kính quét)
+        // B. Nạp thêm tin cào từ Facebook (từ RAM cache hoặc file JSON)
         const fbRoomsPath = path.join(__dirname, 'facebook_rooms.json');
-        if (fs.existsSync(fbRoomsPath)) {
-            try {
-                const fbRooms = JSON.parse(fs.readFileSync(fbRoomsPath, 'utf8'));
-                const filteredFbRooms = fbRooms.filter(room => {
-                    const distanceToTarget = Math.sqrt(
-                        Math.pow(room.coords[0] - lat, 2) + Math.pow(room.coords[1] - lon, 2)
-                    ) * 111.12;
+        try {
+            const fbRooms = typeof fbScraper.getScrapedRooms === 'function'
+                ? fbScraper.getScrapedRooms()
+                : (fs.existsSync(fbRoomsPath) ? JSON.parse(fs.readFileSync(fbRoomsPath, 'utf8')) : []);
 
-                    // Gán khoảng cách động cho trường học đang chọn
-                    room.nearbyUnis = [{ id: "selected-school", distance: parseFloat(distanceToTarget.toFixed(2)) }];
-                    return distanceToTarget <= dist;
-                });
-                combinedRooms = combinedRooms.concat(filteredFbRooms);
-                console.log(`[API] Đã gộp thêm ${filteredFbRooms.length} tin phòng trọ cào từ Facebook.`);
-            } catch (e) {
-                console.error("[ERROR] Lỗi đọc facebook_rooms.json:", e.message);
-            }
+            const filteredFbRooms = fbRooms.filter(room => {
+                const distanceToTarget = Math.sqrt(
+                    Math.pow(room.coords[0] - lat, 2) + Math.pow(room.coords[1] - lon, 2)
+                ) * 111.12;
+
+                // Gán khoảng cách động cho trường học đang chọn
+                room.nearbyUnis = [{ id: "selected-school", distance: parseFloat(distanceToTarget.toFixed(2)) }];
+                return distanceToTarget <= dist;
+            });
+            combinedRooms = combinedRooms.concat(filteredFbRooms);
+            console.log(`[API] Đã gộp thêm ${filteredFbRooms.length} tin phòng trọ cào từ Facebook.`);
+        } catch (e) {
+            console.error("[ERROR] Lỗi đọc tin trọ Facebook:", e.message);
         }
 
         // C. Nạp thêm tin đăng từ Chủ trọ (lưu ở file landlord_rooms.json)

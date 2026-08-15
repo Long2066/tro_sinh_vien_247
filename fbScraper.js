@@ -7,6 +7,7 @@ const ROOMS_FILE_PATH = path.join(__dirname, 'facebook_rooms.json');
 const LOG_FILE_PATH = path.join(__dirname, 'crawler.log');
 
 let inMemoryLogs = [];
+let inMemoryFbRooms = [];
 
 // Ghi log ra file và console
 function writeLog(message) {
@@ -34,6 +35,19 @@ function getLogs() {
         } catch (e) {}
     }
     return inMemoryLogs.join('') || "Chưa có lịch sử cào dữ liệu nào.";
+}
+
+function getScrapedRooms() {
+    if (fs.existsSync(ROOMS_FILE_PATH)) {
+        try {
+            const content = fs.readFileSync(ROOMS_FILE_PATH, 'utf8');
+            const parsed = JSON.parse(content);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return parsed;
+            }
+        } catch (e) {}
+    }
+    return inMemoryFbRooms;
 }
 
 // Hàm chuẩn hóa và chuyển đổi định dạng Cookie (hỗ trợ cả dạng Header String, JSON Array, JSON Object hoặc chuỗi cắt dán)
@@ -482,19 +496,21 @@ async function runScraper() {
         }
     }
 
-    // Ghi kết quả lưu lại
+    // Ghi kết quả lưu lại (Đồng bộ bộ nhớ RAM trước cho Vercel serverless environment)
+    inMemoryFbRooms = allScrapedRooms;
+
     try {
         fs.writeFileSync(ROOMS_FILE_PATH, JSON.stringify(allScrapedRooms, null, 2), 'utf8');
-        writeLog(`==============================================`);
-        writeLog(`🎉 HOÀN THÀNH TIẾN TRÌNH CÀO DỮ LIỆU!`);
-        writeLog(`👉 Đã lưu tổng cộng ${allScrapedRooms.length} tin trọ Facebook.`);
-        writeLog(`👉 Số tin đăng mới tìm thấy trong phiên này: ${newRoomsCount} tin.`);
-        writeLog(`==============================================`);
-        return { success: true, count: newRoomsCount, total: allScrapedRooms.length };
     } catch (writeErr) {
-        writeLog(`❌ Không thể ghi file kết quả: ${writeErr.message}`);
-        return { error: writeErr.message };
+        writeLog(`⚠️ Vercel Read-Only Filesystem: Đã lưu ${allScrapedRooms.length} tin trọ Facebook vào bộ nhớ RAM.`);
     }
+
+    writeLog(`==============================================`);
+    writeLog(`🎉 HOÀN THÀNH TIẾN TRÌNH CÀO DỮ LIỆU!`);
+    writeLog(`👉 Đã lưu tổng cộng ${allScrapedRooms.length} tin trọ Facebook.`);
+    writeLog(`👉 Số tin đăng mới tìm thấy trong phiên này: ${newRoomsCount} tin.`);
+    writeLog(`==============================================`);
+    return { success: true, count: newRoomsCount, total: allScrapedRooms.length };
 }
 
 function extractPrice(text) {
@@ -553,5 +569,6 @@ function extractPrice(text) {
 module.exports = {
     runScraper,
     formatCookie,
-    getLogs
+    getLogs,
+    getScrapedRooms
 };
