@@ -131,14 +131,15 @@ function fetchHtml(url, cookie) {
 
 // Bóc tách tên đường/landmark để phục vụ geocoding
 function extractStreetName(text) {
-    // Tìm các từ khóa chỉ đường phố: ngõ 105 Xuân Thủy, đường Nguyễn Du, v.v.
-    const streetRegex = /(?:ngõ|ngách|đường|phố|số|tại|khu|ngã tư|gần)\s+([0-9A-Za-zà-ỹ\s]{3,25}(?:\s+[A-ZÀ-Ỹa-zà-ỹ0-9]+){1,3})/i;
+    const streetRegex = /(?:ngõ|ngách|đường|phố|tại|khu|ngã tư|gần)\s+([0-9A-Za-zà-ỹ\s]{3,30})/i;
     const match = text.match(streetRegex);
     if (match) {
         let clean = match[0].trim();
-        // Loại bỏ các từ mô tả phụ nếu có
-        clean = clean.replace(/khép kín|giá rẻ|chính chủ|đầy đủ|điều hòa|nóng lạnh/gi, '').trim();
-        return clean;
+        // Cắt bỏ phần mô tả thừa sau tên đường nếu gặp dấu chấm, phẩy, hoặc từ khóa rác
+        clean = clean.split(/[\.,\n\r]|công năng|giá|diện tích|liên hệ|sđt|khép kín|giá rẻ|chính chủ|đầy đủ|điều hòa|nóng lạnh/i)[0].trim();
+        if (clean.length >= 5 && clean.length <= 40) {
+            return clean;
+        }
     }
     return null;
 }
@@ -168,7 +169,7 @@ function isRoomRentalPost(text) {
     return hasKeyword && !hasNegativeKeyword;
 }
 
-// Gọi API Nominatim để lấy tọa độ từ tên địa chỉ
+// Gọi API Nominatim để lấy tọa độ từ tên địa chỉ (Timeout 3 giây để tránh treo tiến trình)
 function geocodeAddress(addressName, defaultCity = "Hà Nội") {
     return new Promise((resolve) => {
         const searchQuery = `${addressName}, ${defaultCity}, Vietnam`;
@@ -180,7 +181,7 @@ function geocodeAddress(addressName, defaultCity = "Hà Nội") {
             }
         };
 
-        https.get(url, options, (res) => {
+        const req = https.get(url, options, (res) => {
             let data = '';
             res.on('data', (chunk) => { data += chunk; });
             res.on('end', () => {
@@ -195,7 +196,14 @@ function geocodeAddress(addressName, defaultCity = "Hà Nội") {
                     resolve(null);
                 }
             });
-        }).on('error', () => {
+        });
+
+        req.setTimeout(3000, () => {
+            req.destroy();
+            resolve(null);
+        });
+
+        req.on('error', () => {
             resolve(null);
         });
     });
