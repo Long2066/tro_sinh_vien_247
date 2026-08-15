@@ -1141,7 +1141,7 @@ const requestHandler = async (req, res) => {
         return;
     }
 
-    // 1.8. API CÔNG KHAI: Người dùng gửi tin đăng trọ chờ duyệt
+    // 1.8. API CÔNG KHAI: Người dùng gửi tin đăng trọ (Tự động đăng trực tiếp lên Firestore bản đồ chính + hàng đợi Admin)
     if (pathname === '/api/rooms/submit' && req.method === 'POST') {
         try {
             const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
@@ -1154,15 +1154,37 @@ const requestHandler = async (req, res) => {
             const body = await getRequestBody(req);
             const newRoom = JSON.parse(body);
 
-            if (!newRoom.title || newRoom.price === undefined || newRoom.price === null || (!newRoom.contactPhone && !newRoom.fbUrl) || !newRoom.coords || !newRoom.address) {
+            const title = (newRoom.title || '').trim();
+            const address = (newRoom.address || '').trim();
+            const phone = (newRoom.contactPhone || '').trim();
+            const fbUrl = (newRoom.fbUrl || '').trim();
+            const ownerName = (newRoom.ownerName || 'Chủ trọ').trim();
+
+            if (!title) {
                 res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(JSON.stringify({ error: 'Thiếu các thông tin bắt buộc (Tiêu đề, Giá, Số điện thoại hoặc Link Facebook, Địa chỉ)!' }));
+                res.end(JSON.stringify({ error: 'Vui lòng nhập Tiêu đề tin đăng!' }));
                 return;
+            }
+            if (!phone && !fbUrl) {
+                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: 'Vui lòng nhập Số điện thoại hoặc Link Facebook cá nhân liên hệ!' }));
+                return;
+            }
+            if (!address) {
+                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: 'Vui lòng nhập Địa chỉ chi tiết phòng trọ!' }));
+                return;
+            }
+
+            // Tọa độ mặc định nếu chèn thiếu
+            let coords = [22.823853, 104.969584];
+            if (Array.isArray(newRoom.coords) && newRoom.coords.length >= 2 && !isNaN(parseFloat(newRoom.coords[0])) && !isNaN(parseFloat(newRoom.coords[1]))) {
+                coords = [parseFloat(newRoom.coords[0]), parseFloat(newRoom.coords[1])];
             }
 
             // Kiểm tra Blacklist SĐT
             const blacklist = getScamBlacklist();
-            const cleanedPhone = (newRoom.contactPhone || '').replace(/[\s\.-]/g, '');
+            const cleanedPhone = phone.replace(/[\s\.-]/g, '');
             if (cleanedPhone) {
                 const isBlacklisted = blacklist.some(b => b.phone.replace(/[\s\.-]/g, '') === cleanedPhone);
                 if (isBlacklisted) {
@@ -1183,45 +1205,37 @@ const requestHandler = async (req, res) => {
                 });
             }
 
-            // Tính khoảng cách GPS chênh lệch
-            let gpsDistanceKm = null;
-            if (newRoom.userCoords && Array.isArray(newRoom.userCoords) && newRoom.userCoords.length === 2) {
-                gpsDistanceKm = getDistanceKm(
-                    parseFloat(newRoom.coords[0]), parseFloat(newRoom.coords[1]),
-                    parseFloat(newRoom.userCoords[0]), parseFloat(newRoom.userCoords[1])
-                );
-            }
-
-            // Phân tích rủi ro bài viết
-            const riskAnalysis = analyzePostRisk(newRoom.title, newRoom.description || '');
-
-            const pendingRoom = {
-                id: `pending-${Date.now()}`,
-                title: newRoom.title,
-                price: parseFloat(newRoom.price),
-                deposit: parseFloat(newRoom.deposit || newRoom.price),
-                address: newRoom.address,
-                coords: [parseFloat(newRoom.coords[0]), parseFloat(newRoom.coords[1])],
-                contactPhone: newRoom.contactPhone || '',
-                fbUrl: newRoom.fbUrl || '',
+            const roomId = `ll-${Date.now()}`;
+            const publishedRoom = {
+                id: roomId,
+                title: title,
+                price: parseFloat(newRoom.price) || 0,
+                deposit: parseFloat(newRoom.deposit || newRoom.price) || 0,
+                address: address,
+                coords: coords,
+                contactPhone: phone,
+                fbUrl: fbUrl,
                 ownerType: 'owner',
-                ownerName: newRoom.ownerName || 'Chủ trọ',
+                ownerName: ownerName,
                 rating: 5.0,
                 amenities: Array.isArray(newRoom.amenities) ? newRoom.amenities : [],
                 description: newRoom.description || 'Không có mô tả chi tiết.',
                 images: savedImageUrls,
-                userCoords: newRoom.userCoords || null,
-                gpsDistanceKm: gpsDistanceKm,
-                riskScore: riskAnalysis.score,
-                redFlags: riskAnalysis.redFlags,
+                verified: true,
+                tags: ["Chính chủ", "Tin mới đăng"],
                 submittedAt: new Date().toISOString()
             };
 
-            await addPendingRoom(pendingRoom);
+            // Ghi vĩnh viễn trực tiếp vào Firestore landlord_rooms để đăng ngay lập tức
+            await addLandlordRoom(publishedRoom);
+
+            // Đồng thời tạo bản ghi ở pending_rooms để Admin có thể xem nhật ký duyệt
+            await addPendingRoom({ ...publishedRoom, id: `pending-${Date.now()}` });
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ success: true, message: 'Đăng tin thành công! Tin đăng của bạn đang chờ Admin kiểm duyệt.' }));
+            res.end(JSON.stringify({ success: true, message: 'Đăng tin thành công! Phòng trọ của bạn đã được hiển thị trên bản đồ chính.', room: publishedRoom }));
         } catch (e) {
+            console.error("[SERVER] Lỗi đăng tin phòng trọ:", e);
             res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ error: 'Lỗi gửi tin đăng phòng trọ', details: e.message }));
         }
