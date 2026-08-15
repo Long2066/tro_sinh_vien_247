@@ -84,13 +84,15 @@
                         </div>
                         
                         <!-- Chọn trường Đại học -->
-                        <div class="filter-input-group" style="position: relative;">
-                            <label for="uni-search-input">Trường Đại học, Cao đẳng</label>
+                        <div class="filter-input-group" style="position: relative; margin-bottom: 8px;">
+                            <label for="uni-search-input" style="font-size: 13px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                                <i class="fa-solid fa-graduation-cap" style="color: #60a5fa; font-size: 16px;"></i> Tìm Trường Đại Học, Cao Đẳng
+                            </label>
                             <div style="position: relative; display: flex; align-items: center;">
-                                <input type="search" id="uni-search-input" placeholder="Gõ tên trường (VD: Bách Khoa, Thủy Lợi...)" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" inputmode="search" style="padding-right: 36px;">
-                                <button type="button" id="clear-uni-btn" style="position: absolute; right: 10px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; display: none;">&times;</button>
+                                <input type="text" id="uni-search-input" placeholder="🔍 Gõ tên trường (VD: Hà Giang, Bách Khoa, Sư Phạm...)" autocomplete="off" autocapitalize="off" spellcheck="false" class="uni-search-custom">
+                                <button type="button" id="clear-uni-btn" title="Xóa tìm kiếm" style="position: absolute; right: 10px; background: rgba(255,255,255,0.15); border: none; color: #cbd5e1; cursor: pointer; font-size: 16px; width: 26px; height: 26px; border-radius: 50%; display: none; align-items: center; justify-content: center;">&times;</button>
                             </div>
-                            <div id="uni-suggestions" class="suggestions-container" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; z-index: 1010; box-shadow: var(--shadow-main);"></div>
+                            <div id="uni-suggestions" class="suggestions-container" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; z-index: 1010; box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.6); border-radius: 10px; margin-top: 4px;"></div>
                         </div>
 
                         <!-- Chọn địa giới hành chính (Tỉnh/Thành & Phường/Xã - Đã ẩn theo yêu cầu) -->

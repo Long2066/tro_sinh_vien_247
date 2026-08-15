@@ -1251,5 +1251,68 @@ select:focus, input:focus, textarea:focus {
     }
 }
 
+/* ==========================================
+   TỐI ƯU Ô TÌM KIẾM TRƯỜNG ĐẠI HỌC/CAO ĐẲNG
+   ========================================== */
+.uni-search-custom, input[type="search"] {
+    background: rgba(15, 23, 42, 0.95) !important;
+    border: 2px solid rgba(59, 130, 246, 0.4) !important;
+    border-radius: 10px !important;
+    padding: 12px 40px 12px 14px !important;
+    color: #ffffff !important;
+    font-size: 14.5px !important;
+    font-weight: 600 !important;
+    height: 48px !important;
+    outline: none !important;
+    transition: all 0.25s ease !important;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.3) !important;
+    width: 100% !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+}
+
+.uni-search-custom:focus, input[type="search"]:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3), inset 0 2px 4px rgba(0,0,0,0.3) !important;
+    background: rgba(15, 23, 42, 1) !important;
+}
+
+.uni-search-custom::placeholder, input[type="search"]::placeholder {
+    color: #94a3b8 !important;
+    font-size: 13px !important;
+    font-weight: 400 !important;
+}
+
+/* Override autofill màu trắng của trình duyệt trên Chrome/Edge/Safari */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-text-fill-color: #ffffff !important;
+    -webkit-box-shadow: 0 0 0px 1000px #0f172a inset !important;
+    transition: background-color 5000s ease-in-out 0s !important;
+}
+
+.suggestions-container {
+    background: rgba(15, 23, 42, 0.98) !important;
+    border: 1.5px solid rgba(59, 130, 246, 0.4) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+}
+
+.suggestion-item {
+    padding: 10px 14px !important;
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+    color: #cbd5e1 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    transition: background 0.2s ease !important;
+}
+
+.suggestion-item:hover, .suggestion-item.active {
+    background: rgba(59, 130, 246, 0.2) !important;
+    color: #38bdf8 !important;
+}
+
 
 

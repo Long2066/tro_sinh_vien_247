@@ -818,8 +818,10 @@ const requestHandler = async (req, res) => {
 
         if (provinceCode || wardCode) {
             combinedRooms = combinedRooms.filter(room => {
-                if (provinceCode && room.provinceCode !== provinceCode) return false;
-                if (wardCode && room.wardCode !== wardCode) return false;
+                if (room.ownerType === 'owner') return true;
+                if (provinceCode && room.provinceCode && room.provinceCode !== provinceCode) return false;
+                if (wardCode && room.wardCode && room.wardCode !== wardCode) return false;
+                return true;
             });
             console.log(`[API] Đã lọc còn lại ${combinedRooms.length} phòng theo địa giới hành chính.`);
         }
