@@ -38,16 +38,7 @@ function getLogs() {
 }
 
 function getScrapedRooms() {
-    if (fs.existsSync(ROOMS_FILE_PATH)) {
-        try {
-            const content = fs.readFileSync(ROOMS_FILE_PATH, 'utf8');
-            const parsed = JSON.parse(content);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                return parsed;
-            }
-        } catch (e) {}
-    }
-    return inMemoryFbRooms;
+    return [];
 }
 
 // Hàm chuẩn hóa và chuyển đổi định dạng Cookie (hỗ trợ cả dạng Header String, JSON Array, JSON Object hoặc chuỗi cắt dán)
