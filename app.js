@@ -1387,31 +1387,26 @@ function initEventListeners() {
     document.getElementById('cancel-post-btn').addEventListener('click', closePostModal);
     document.getElementById('submit-post-btn').addEventListener('click', submitPostRoom);
     document.getElementById('post-images').addEventListener('change', handlePostImageSelect);
-    document.getElementById('post-address').addEventListener('change', geocodePostAddress);
-    
-    // Sự kiện toggle giá liên hệ chủ nhà
-    const priceContactCb = document.getElementById('post-price-contact');
-    const priceInput = document.getElementById('post-price');
-    if (priceContactCb && priceInput) {
-        priceContactCb.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                priceInput.value = '';
-                priceInput.disabled = true;
-                priceInput.placeholder = 'LH Chủ Nhà (Trọ) để nhận báo giá';
-                priceInput.removeAttribute('required');
-            } else {
-                priceInput.disabled = false;
-                priceInput.placeholder = 'VD: 3500000';
-                priceInput.setAttribute('required', 'true');
+    // Sự kiện nhập địa chỉ để auto-search định vị trên bản đồ
+    let postGeocodeTimeout = null;
+    const postAddrInput = document.getElementById('post-address');
+    if (postAddrInput) {
+        postAddrInput.addEventListener('input', () => {
+            clearTimeout(postGeocodeTimeout);
+            postGeocodeTimeout = setTimeout(() => {
+                geocodePostAddress();
+            }, 600);
+        });
+        postAddrInput.addEventListener('blur', geocodePostAddress);
+        postAddrInput.addEventListener('change', geocodePostAddress);
+        postAddrInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(postGeocodeTimeout);
+                geocodePostAddress();
             }
         });
     }
-    document.getElementById('post-address').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            geocodePostAddress();
-        }
-    });
 
     // Sự kiện đóng Modal chi tiết phòng
     document.getElementById('close-detail-modal-btn').addEventListener('click', closeRoomDetailsModal);
@@ -1988,6 +1983,17 @@ function resetPostForm() {
     renderPostImagePreviews();
 }
 
+// Tự động làm sạch địa chỉ để loại bỏ các thông tin rác mà Nominatim không nhận diện được
+function cleanAddressForGeocoding(addr) {
+    if (!addr) return '';
+    return addr
+        .replace(/(?:tổ|ngõ|ngách|hẻm|số|khu|xóm|đội|tòa|căn)\s+[0-9A-Za-z\-]+/gi, '')
+        .replace(/\s+/g, ' ')
+        .replace(/,\s*,/g, ',')
+        .replace(/^[\s,]+|[\s,]+$/g, '')
+        .trim();
+}
+
 // Định vị bản đồ nhỏ dựa vào địa chỉ người dùng tự nhập ở modal đăng tin
 async function geocodePostAddress() {
     const addressInput = document.getElementById('post-address');
@@ -1995,55 +2001,64 @@ async function geocodePostAddress() {
     if (!address) return;
 
     const statusLabel = document.getElementById('post-map-hint');
-    if (!statusLabel) return;
-    
-    const originalText = statusLabel.innerHTML;
-    statusLabel.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tự động tìm vị trí trên bản đồ...';
+    const originalText = statusLabel ? statusLabel.innerHTML : '';
+    if (statusLabel) {
+        statusLabel.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang tự động tìm vị trí trên bản đồ...';
+    }
 
     try {
-        // Tự động tìm kiếm tọa độ qua OpenStreetMap Nominatim
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`;
-        const res = await fetch(url, {
-            headers: { 'User-Agent': 'SmartRoomFinder/1.0' }
-        });
-        
-        if (res.ok) {
-            const data = await res.json();
-            if (data && data.length > 0) {
-                const lat = parseFloat(data[0].lat);
-                const lon = parseFloat(data[0].lon);
+        // Thử tìm kiếm với địa chỉ nguyên bản
+        let searchQuery = address;
+        let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery + ', Vietnam')}&format=json&limit=1`;
+        let res = await fetch(url, { headers: { 'User-Agent': 'SmartRoomFinder/1.0' } });
+        let data = res.ok ? await res.json() : [];
 
-                // Điền vĩ độ và kinh độ vào các input ẩn/chỉ đọc để gửi lên
-                document.getElementById('post-lat').value = lat.toFixed(6);
-                document.getElementById('post-lon').value = lon.toFixed(6);
+        // Nếu không ra kết quả, tự động làm sạch (bỏ tổ/ngõ/ngách/số) để tìm lại
+        if (!data || data.length === 0) {
+            const cleanedQuery = cleanAddressForGeocoding(address);
+            if (cleanedQuery && cleanedQuery !== address) {
+                url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanedQuery + ', Vietnam')}&format=json&limit=1`;
+                res = await fetch(url, { headers: { 'User-Agent': 'SmartRoomFinder/1.0' } });
+                data = res.ok ? await res.json() : [];
+            }
+        }
 
-                // Di chuyển bản đồ nhỏ & định vị marker
-                if (appState.postMap) {
-                    appState.postMap.setView([lat, lon], 16);
-                    
-                    if (appState.postMarker) {
-                        appState.postMarker.setLatLng([lat, lon]);
-                    } else {
-                        appState.postMarker = L.marker([lat, lon]).addTo(appState.postMap);
-                    }
-                }
+        if (data && data.length > 0) {
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+
+            // Điền vĩ độ và kinh độ vào các input
+            document.getElementById('post-lat').value = lat.toFixed(6);
+            document.getElementById('post-lon').value = lon.toFixed(6);
+
+            // Di chuyển bản đồ nhỏ & định vị marker
+            if (appState.postMap) {
+                appState.postMap.setView([lat, lon], 16);
                 
-                statusLabel.innerHTML = '<i class="fa-solid fa-circle-check" style="color: #10b981;"></i> Đã định vị địa chỉ thành công! Bạn vẫn có thể ghim lại trên bản đồ.';
-                setTimeout(() => {
-                    statusLabel.innerHTML = originalText;
-                }, 3000);
-            } else {
-                statusLabel.innerHTML = '<i class="fa-solid fa-circle-xmark" style="color: #ef4444;"></i> Không tìm thấy địa chỉ này trên bản đồ. Bạn hãy ghim thủ công bằng cách click lên bản đồ.';
+                if (appState.postMarker) {
+                    appState.postMarker.setLatLng([lat, lon]);
+                } else {
+                    appState.postMarker = L.marker([lat, lon]).addTo(appState.postMap);
+                }
+            }
+            
+            if (statusLabel) {
+                statusLabel.innerHTML = '<i class="fa-solid fa-circle-check" style="color: #10b981;"></i> Đã tự động định vị và ghim vị trí trên bản đồ! Bạn vẫn có thể ghim lại bằng cách click trực tiếp.';
                 setTimeout(() => {
                     statusLabel.innerHTML = originalText;
                 }, 4000);
             }
         } else {
-            statusLabel.innerHTML = originalText;
+            if (statusLabel) {
+                statusLabel.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color: #f59e0b;"></i> Không tìm thấy địa chỉ cụ thể. Hãy ghim thủ công bằng cách click lên bản đồ.';
+                setTimeout(() => {
+                    statusLabel.innerHTML = originalText;
+                }, 4000);
+            }
         }
     } catch (err) {
         console.error("Lỗi định vị:", err);
-        statusLabel.innerHTML = originalText;
+        if (statusLabel) statusLabel.innerHTML = originalText;
     }
 }
 
