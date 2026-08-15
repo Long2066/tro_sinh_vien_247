@@ -112,23 +112,31 @@ function analyzePostRisk(title, description) {
     };
 }
 
+let inMemoryConfig = null;
+
 // Khởi tạo và lấy cấu hình hệ thống
 function getFileSystemConfig() {
+    if (inMemoryConfig !== null) {
+        return inMemoryConfig;
+    }
     const config = { fbCookie: "", fbGroups: [], adminSecretToken: "admin_secret_token_123" };
     if (!fs.existsSync(configPath)) {
-        return config;
+        inMemoryConfig = config;
+        return inMemoryConfig;
     }
 
     try {
         const fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        return {
+        inMemoryConfig = {
             fbCookie: typeof fileConfig.fbCookie === 'string' ? fileConfig.fbCookie : "",
             fbGroups: Array.isArray(fileConfig.fbGroups) ? fileConfig.fbGroups : [],
             adminSecretToken: (typeof fileConfig.adminSecretToken === 'string' && fileConfig.adminSecretToken.trim()) ? fileConfig.adminSecretToken.trim() : "admin_secret_token_123"
         };
+        return inMemoryConfig;
     } catch (e) {
         console.warn("[SERVER] Lỗi đọc config.json:", e.message);
-        return config;
+        inMemoryConfig = config;
+        return inMemoryConfig;
     }
 }
 
@@ -873,12 +881,14 @@ const requestHandler = async (req, res) => {
                 configToSave.fbCookie = submittedConfig.fbCookie.trim();
             }
 
-            if (!process.env.ADMIN_SECRET_TOKEN && typeof submittedConfig.adminSecretToken === 'string' && submittedConfig.adminSecretToken.trim()) {
-                configToSave.adminSecretToken = submittedConfig.adminSecretToken.trim();
+            inMemoryConfig = configToSave;
+
+            try {
+                fs.writeFileSync(configPath, JSON.stringify(configToSave, null, 2), 'utf8');
+            } catch (fsErr) {
+                console.warn("[SERVER] Vercel read-only filesystem detected. Saved config to memory.");
             }
 
-            fs.writeFileSync(configPath, JSON.stringify(configToSave, null, 2), 'utf8');
-            
             res.writeHead(200, {
                 'Content-Type': 'application/json; charset=utf-8',
                 'Cache-Control': 'no-store'

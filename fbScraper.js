@@ -246,8 +246,8 @@ async function runScraper() {
         const groupUrl = parts[0].trim();
         const defaultCity = parts[1] ? parts[1].trim() : "Hà Nội";
 
-        // Trích xuất ID nhóm từ URL (ví dụ: facebook.com/groups/12345/ -> 12345)
-        const idMatch = groupUrl.match(/\/groups\/([0-9a-zA-Z\.\-]+)/);
+        // Trích xuất ID nhóm từ URL (Hỗ trợ cả dạng /groups/ID và /share/g/ID)
+        const idMatch = groupUrl.match(/\/(?:groups|share\/g)\/([0-9a-zA-Z\.\-]+)/);
         if (!idMatch) {
             writeLog(`❌ URL nhóm không hợp lệ: "${groupUrl}"`);
             continue;
