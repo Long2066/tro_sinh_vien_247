@@ -28,6 +28,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initRoommates();
     initEventListeners();
     initLocationFilters();
+
+    // Mặc định tự động chọn Phân hiệu Đại học Thái Nguyên tại Hà Giang
+    if (UNIVERSITIES && UNIVERSITIES.length > 0) {
+        selectSchool(UNIVERSITIES[0]);
+    }
 });
 
 // 1. Khởi tạo dữ liệu (từ LocalStorage hoặc dùng dữ liệu mẫu ban đầu)
@@ -1069,7 +1074,11 @@ function applyFilters() {
                 selectedSchool.coords[0], selectedSchool.coords[1]
             );
             
-            const maxDist = selectedDistance !== 'all' ? parseFloat(selectedDistance) : 10.0;
+            let maxDist = selectedDistance !== 'all' ? parseFloat(selectedDistance) : 10.0;
+            // Với tin trọ do Chủ nhà / Người dùng đăng (hoặc đã duyệt), nới lỏng bán kính tối thiểu 40km để luôn hiển thị
+            if (room.ownerType === 'owner' || room.verified) {
+                maxDist = Math.max(maxDist, 40.0);
+            }
             if (distance > maxDist) {
                 return false;
             }

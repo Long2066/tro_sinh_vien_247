@@ -806,8 +806,16 @@ const requestHandler = async (req, res) => {
         // Chuẩn hóa địa chỉ và bổ sung thông tin địa giới hành chính
         combinedRooms = combinedRooms.map(room => {
             const std = locationService.standardizeAddress(room.address);
+            const fixedImages = Array.isArray(room.images) ? room.images.map(img => {
+                if (typeof img === 'string' && img.includes('localhost:')) {
+                    return 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=600&q=80';
+                }
+                return img;
+            }) : [];
+
             return {
                 ...room,
+                images: fixedImages.length > 0 ? fixedImages : ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=600&q=80"],
                 standardizedAddress: std.standardized,
                 provinceCode: std.province ? std.province.code : null,
                 wardCode: std.ward ? std.ward.code : null
