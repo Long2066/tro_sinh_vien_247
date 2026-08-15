@@ -683,8 +683,7 @@ const requestHandler = async (req, res) => {
             
             if (chototData.ads && chototData.ads.length > 0) {
                 const formattedRooms = chototData.ads.map((ad) => {
-                    const amenities = parseAmenities(ad.body);
-                    const contactPhone = extractPhone(ad.body, "09" + Math.floor(10000000 + Math.random() * 90000000));
+                    const contactPhone = extractPhone(ad.body, "");
                     const ownerType = ad.company_ad ? 'broker' : 'owner';
                     
                     const tags = ["Tin thực tế"];

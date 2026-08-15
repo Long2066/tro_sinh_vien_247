@@ -523,5 +523,6 @@ function extractPrice(text) {
 }
 
 module.exports = {
-    runScraper
+    runScraper,
+    formatCookie
 };
