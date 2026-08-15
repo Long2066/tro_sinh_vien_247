@@ -317,6 +317,10 @@ function saveBase64Image(base64Str, index) {
     try {
         const matches = base64Str.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
         if (!matches || matches.length !== 3) {
+            // Nếu không phải base64 nhưng là URL hợp lệ, giữ nguyên
+            if (typeof base64Str === 'string' && (base64Str.startsWith('http') || base64Str.startsWith('/'))) {
+                return base64Str;
+            }
             return null;
         }
 
@@ -327,10 +331,20 @@ function saveBase64Image(base64Str, index) {
         const filename = `img-${Date.now()}-${index}-${Math.floor(Math.random() * 1000)}.${ext}`;
         const filepath = path.join(uploadsDir, filename);
         
-        fs.writeFileSync(filepath, buffer);
-        return `/uploads/${filename}`;
+        try {
+            fs.writeFileSync(filepath, buffer);
+            return `/uploads/${filename}`;
+        } catch (writeErr) {
+            // Vercel read-only filesystem: giữ nguyên base64 data URI để frontend hiển thị trực tiếp
+            console.warn("[SERVER] Filesystem read-only, giữ ảnh dạng base64 data URI.");
+            return base64Str;
+        }
     } catch (e) {
         console.error("Lỗi giải mã base64 và lưu file ảnh:", e.message);
+        // Trả về nguyên bản nếu là chuỗi hợp lệ
+        if (typeof base64Str === 'string' && base64Str.length > 0) {
+            return base64Str;
+        }
         return null;
     }
 }
@@ -806,16 +820,17 @@ const requestHandler = async (req, res) => {
         // Chuẩn hóa địa chỉ và bổ sung thông tin địa giới hành chính
         combinedRooms = combinedRooms.map(room => {
             const std = locationService.standardizeAddress(room.address);
+            // Giữ nguyên ảnh gốc (bao gồm base64 data URI), chỉ thay thế URL localhost bị hỏng
             const fixedImages = Array.isArray(room.images) ? room.images.map(img => {
                 if (typeof img === 'string' && img.includes('localhost:')) {
                     return 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=600&q=80';
                 }
                 return img;
-            }) : [];
+            }).filter(img => img && img.length > 0) : [];
 
             return {
                 ...room,
-                images: fixedImages.length > 0 ? fixedImages : ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=600&q=80"],
+                images: fixedImages,
                 standardizedAddress: std.standardized,
                 provinceCode: std.province ? std.province.code : null,
                 wardCode: std.ward ? std.ward.code : null
