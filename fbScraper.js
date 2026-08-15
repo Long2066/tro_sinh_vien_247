@@ -522,9 +522,14 @@ async function runScraper() {
 }
 
 function extractPrice(text) {
-    if (!text) return 2000000;
+    if (!text) return 0;
 
     const cleanText = text.toLowerCase();
+    
+    // Nếu bài viết ghi rõ inbox/thỏa thuận/liên hệ báo giá thì mặc định 0 (LH Chủ Nhà)
+    if (cleanText.includes("inbox") || cleanText.includes("thỏa thuận") || cleanText.includes("thoả thuận") || cleanText.includes("báo giá") || cleanText.includes("liên hệ giá")) {
+        return 0;
+    }
 
     // 1. Dạng đặc biệt "2tr5" (số + tr + số) hoặc "2t5"
     const trNumRegex = /(\d+)\s*(?:tr|t)\s*(\d+)/i;
@@ -571,7 +576,7 @@ function extractPrice(text) {
         }
     }
 
-    return 2000000; // Giá mặc định 2 triệu
+    return 0; // Trả về 0 để hiển thị: "LH Chủ Nhà (Trọ) để nhận báo giá"
 }
 
 module.exports = {

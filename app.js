@@ -834,7 +834,7 @@ function renderRooms(roomsToRender) {
 
         // Định dạng tiền tệ
         const priceVal = parseFloat(room.price) || 0;
-        const formattedPrice = priceVal > 0 ? (priceVal / 1000000).toFixed(1) + ' Tr' : 'Thỏa thuận';
+        const formattedPrice = priceVal > 0 ? (priceVal / 1000000).toFixed(1) + ' Tr' : 'LH Chủ Nhà (Trọ) để nhận báo giá';
 
         // Render nhãn tags phụ trên thẻ phòng trọ danh sách
         let tagsHTML = '';
@@ -861,7 +861,7 @@ function renderRooms(roomsToRender) {
             </div>
             
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div class="room-price">${formattedPrice}<span>/tháng</span></div>
+                <div class="room-price" style="${priceVal <= 0 ? 'font-size: 11.5px; color: #38bdf8; font-weight: 600;' : ''}">${formattedPrice}${priceVal > 0 ? '<span>/tháng</span>' : ''}</div>
                 <div style="font-size: 13px; color: var(--text-secondary); display: flex; gap: 6px; align-items: center;">
                      ${roomAmenitiesHTML}
                      ${amenitiesArr.length > 5 ? `<span style="font-size: 10px; color: var(--text-muted)">+${amenitiesArr.length - 5}</span>` : ''}
@@ -934,7 +934,7 @@ function renderRooms(roomsToRender) {
         // Popup chi tiết khi click vào marker
         const popupContent = `
             <div class="map-popup-title">${room.title}</div>
-            <div class="map-popup-price">${formattedPrice}/tháng</div>
+            <div class="map-popup-price" style="${priceVal <= 0 ? 'font-size: 11.5px; color: #38bdf8;' : ''}">${formattedPrice}${priceVal > 0 ? '/tháng' : ''}</div>
             <div class="map-popup-details">
                 <p><i class="fa-solid fa-phone"></i> LH: <strong>${room.contactPhone}</strong> (${room.ownerName})</p>
                 <p><i class="fa-solid fa-location-crosshairs"></i> ${formatAddressToPostMerger(room.address)}</p>
@@ -1050,7 +1050,7 @@ function applyFilters() {
         }
 
         // Lọc theo khoảng giá
-        if (room.price < minPrice || room.price > maxPrice) {
+        if (room.price > 0 && (room.price < minPrice || room.price > maxPrice)) {
             return false;
         }
 
@@ -1388,6 +1388,24 @@ function initEventListeners() {
     document.getElementById('submit-post-btn').addEventListener('click', submitPostRoom);
     document.getElementById('post-images').addEventListener('change', handlePostImageSelect);
     document.getElementById('post-address').addEventListener('change', geocodePostAddress);
+    
+    // Sự kiện toggle giá liên hệ chủ nhà
+    const priceContactCb = document.getElementById('post-price-contact');
+    const priceInput = document.getElementById('post-price');
+    if (priceContactCb && priceInput) {
+        priceContactCb.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                priceInput.value = '';
+                priceInput.disabled = true;
+                priceInput.placeholder = 'LH Chủ Nhà (Trọ) để nhận báo giá';
+                priceInput.removeAttribute('required');
+            } else {
+                priceInput.disabled = false;
+                priceInput.placeholder = 'VD: 3500000';
+                priceInput.setAttribute('required', 'true');
+            }
+        });
+    }
     document.getElementById('post-address').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -1540,7 +1558,7 @@ function showRoomDetails(room) {
     document.getElementById('detail-title').textContent = room.title || 'Chi Tiết Phòng Trọ';
     
     const priceVal = parseFloat(room.price) || 0;
-    document.getElementById('detail-price').textContent = priceVal > 0 ? (priceVal / 1000000).toFixed(1) + ' Tr/tháng' : 'Liên hệ';
+    document.getElementById('detail-price').textContent = priceVal > 0 ? (priceVal / 1000000).toFixed(1) + ' Tr/tháng' : 'LH Chủ Nhà (Trọ) để nhận báo giá';
     
     const depositVal = parseFloat(room.deposit) || 0;
     document.getElementById('detail-deposit').textContent = depositVal > 0 ? (depositVal / 1000000).toFixed(1) + ' Tr' : 'Không yêu cầu';
@@ -1872,7 +1890,9 @@ function renderPostImagePreviews() {
 // Gửi tin đăng trọ lên máy chủ chờ duyệt
 async function submitPostRoom() {
     const title = document.getElementById('post-title').value.trim();
-    const price = document.getElementById('post-price').value.trim();
+    const isContactPrice = document.getElementById('post-price-contact')?.checked;
+    const priceRaw = document.getElementById('post-price').value.trim();
+    const priceVal = isContactPrice ? 0 : parseFloat(priceRaw);
     const deposit = document.getElementById('post-deposit').value.trim();
     const phone = document.getElementById('post-phone').value.trim();
     const ownerName = document.getElementById('post-owner-name').value.trim();
@@ -1881,7 +1901,7 @@ async function submitPostRoom() {
     const lon = document.getElementById('post-lon').value.trim();
     const description = document.getElementById('post-desc').value.trim();
 
-    if (!title || !price || !phone || !ownerName || !address || !lat || !lon) {
+    if (!title || (!isContactPrice && !priceRaw) || !phone || !ownerName || !address || !lat || !lon) {
         showToast("Vui lòng điền đầy đủ các thông tin có dấu (*)", true);
         return;
     }
@@ -1898,8 +1918,8 @@ async function submitPostRoom() {
 
     const roomData = {
         title: title,
-        price: parseFloat(price),
-        deposit: parseFloat(deposit || price),
+        price: priceVal,
+        deposit: parseFloat(deposit || priceVal),
         contactPhone: phone,
         ownerName: ownerName,
         address: address,
@@ -1941,6 +1961,16 @@ async function submitPostRoom() {
 // Reset form đăng trọ người dùng
 function resetPostForm() {
     document.getElementById('post-title').value = '';
+    const priceContactCb = document.getElementById('post-price-contact');
+    if (priceContactCb) {
+        priceContactCb.checked = false;
+        const priceInput = document.getElementById('post-price');
+        if (priceInput) {
+            priceInput.disabled = false;
+            priceInput.placeholder = 'VD: 3500000';
+            priceInput.setAttribute('required', 'true');
+        }
+    }
     document.getElementById('post-price').value = '';
     document.getElementById('post-deposit').value = '';
     document.getElementById('post-phone').value = '';
