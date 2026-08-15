@@ -6,16 +6,34 @@ const path = require('path');
 const ROOMS_FILE_PATH = path.join(__dirname, 'facebook_rooms.json');
 const LOG_FILE_PATH = path.join(__dirname, 'crawler.log');
 
+let inMemoryLogs = [];
+
 // Ghi log ra file và console
 function writeLog(message) {
-    const time = new Date().toLocaleTimeString();
+    const time = new Date().toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
     const logLine = `[${time}] ${message}\n`;
     console.log(`[FB-SCRAPER] ${message}`);
+    
+    inMemoryLogs.push(logLine);
+    if (inMemoryLogs.length > 300) {
+        inMemoryLogs.shift();
+    }
+
     try {
         fs.appendFileSync(LOG_FILE_PATH, logLine, 'utf8');
     } catch (err) {
-        console.error("Lỗi ghi log file:", err.message);
+        // Bỏ qua lỗi ghi đĩa cứng trên Vercel read-only filesystem
     }
+}
+
+function getLogs() {
+    if (fs.existsSync(LOG_FILE_PATH)) {
+        try {
+            const content = fs.readFileSync(LOG_FILE_PATH, 'utf8');
+            if (content && content.trim()) return content;
+        } catch (e) {}
+    }
+    return inMemoryLogs.join('') || "Chưa có lịch sử cào dữ liệu nào.";
 }
 
 // Hàm chuẩn hóa và chuyển đổi định dạng Cookie (hỗ trợ cả dạng Header String, JSON Array, JSON Object hoặc chuỗi cắt dán)
@@ -171,8 +189,17 @@ function geocodeAddress(addressName, defaultCity = "Hà Nội") {
 
 // Hàm chạy cào dữ liệu từ danh sách nhóm
 async function runScraper() {
-    // Tạo/Xóa log cũ cho phiên mới
-    fs.writeFileSync(LOG_FILE_PATH, `--- Khởi tạo phiên cào dữ liệu Facebook mới: ${new Date().toLocaleString()} ---\n`, 'utf8');
+    // Tạo/Xóa log cũ cho phiên mới (tính theo giờ Việt Nam)
+    const startTimeStr = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const headerLine = `--- Khởi tạo phiên cào dữ liệu Facebook mới: ${startTimeStr} ---\n`;
+    inMemoryLogs = [headerLine];
+    
+    try {
+        fs.writeFileSync(LOG_FILE_PATH, headerLine, 'utf8');
+    } catch (e) {
+        // Bỏ qua trên Vercel read-only filesystem
+    }
+    
     writeLog("Đang tải cấu hình Facebook từ biến môi trường hoặc config.json...");
     
     let config = { fbCookie: "", fbGroups: [] };
@@ -525,5 +552,6 @@ function extractPrice(text) {
 
 module.exports = {
     runScraper,
-    formatCookie
+    formatCookie,
+    getLogs
 };

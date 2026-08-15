@@ -918,16 +918,8 @@ const requestHandler = async (req, res) => {
 
     // 1.4. API ADMIN: Lấy lịch sử Logs cào dữ liệu gần nhất
     if (pathname === '/api/admin/logs' && req.method === 'GET') {
-        const logPath = path.join(__dirname, 'crawler.log');
-        let logs = "Chưa có lịch sử cào dữ liệu nào.";
-        if (fs.existsSync(logPath)) {
-            try {
-                logs = fs.readFileSync(logPath, 'utf8');
-            } catch (e) {
-                logs = "Lỗi đọc file logs.";
-            }
-        }
-        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        const logs = typeof fbScraper.getLogs === 'function' ? fbScraper.getLogs() : "Chưa có lịch sử cào dữ liệu nào.";
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
         res.end(logs);
         return;
     }
