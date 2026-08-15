@@ -125,11 +125,127 @@ function initMap() {
 }
 
 // 4. Khởi tạo tìm kiếm trường Đại học thông minh (Autocomplete & API Geocoding)
+function normalizeSearchText(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function expandSchoolAbbreviations(normalizedValue) {
+    return ` ${normalizedValue} `
+        .replace(/\bdh\s*tn\b/g, ' dai hoc thai nguyen ')
+        .replace(/\bdhtn\b/g, ' dai hoc thai nguyen ')
+        .replace(/\bđhtn\b/g, ' dai hoc thai nguyen ')
+        .replace(/\bhg\b/g, ' ha giang ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function getSchoolSearchTerms(school) {
+    const aliases = Array.isArray(school.aliases) ? school.aliases : [];
+    return [school.name, school.abbr, school.address, ...aliases]
+        .map(normalizeSearchText)
+        .filter(Boolean);
+}
+
+function schoolMatchesQuery(school, rawQuery) {
+    const query = normalizeSearchText(rawQuery);
+    if (!query) return true;
+
+    const expandedQuery = expandSchoolAbbreviations(query);
+    const searchableText = getSchoolSearchTerms(school).join(' ');
+
+    return searchableText.includes(query) ||
+        (expandedQuery !== query && searchableText.includes(expandedQuery));
+}
+
+function getLocalSchoolMatches(rawQuery) {
+    const query = normalizeSearchText(rawQuery);
+    if (!query) return UNIVERSITIES;
+
+    return UNIVERSITIES.filter(uni => schoolMatchesQuery(uni, query));
+}
+
+function getBestSchoolMatch(rawQuery) {
+    const query = normalizeSearchText(rawQuery);
+    if (!query) return null;
+
+    const expandedQuery = expandSchoolAbbreviations(query);
+    const localMatches = getLocalSchoolMatches(query);
+    if (localMatches.length === 0) return null;
+
+    return localMatches.find(uni => {
+        const terms = getSchoolSearchTerms(uni);
+        return terms.includes(query) || terms.includes(expandedQuery);
+    }) || localMatches[0];
+}
+
+function mergeSchoolSuggestions(localMatches, apiMatches) {
+    const combined = [...localMatches];
+
+    apiMatches.forEach(apiSchool => {
+        const exists = combined.some(localSchool => {
+            const sameName = normalizeSearchText(localSchool.name) === normalizeSearchText(apiSchool.name);
+            const hasCoords = Array.isArray(localSchool.coords) && Array.isArray(apiSchool.coords);
+            const sameArea = hasCoords && getDistance(
+                localSchool.coords[0], localSchool.coords[1],
+                apiSchool.coords[0], apiSchool.coords[1]
+            ) < 0.1;
+
+            return sameName || sameArea;
+        });
+
+        if (!exists) {
+            combined.push(apiSchool);
+        }
+    });
+
+    return combined;
+}
+
+function revealRoomSearchResultsOnMobile() {
+    if (!window.matchMedia || !window.matchMedia('(max-width: 900px)').matches) return;
+
+    const container = document.querySelector('.app-container');
+    const sidebar = document.getElementById('sidebar');
+    const mobileToggleBtn = document.getElementById('mobile-map-toggle');
+    const sheetBtnText = document.getElementById('sheet-toggle-text');
+    const sheetBtnIcon = document.getElementById('sheet-toggle-icon');
+    const tabWrapper = document.querySelector('.tab-content-wrapper');
+    const roomList = document.getElementById('room-list');
+
+    if (!container || !sidebar) return;
+
+    sidebar.classList.remove('hidden');
+    container.classList.add('map-collapsed');
+    appState.isMapVisibleOnMobile = false;
+
+    if (sheetBtnText) sheetBtnText.textContent = "Hiện Bản Đồ";
+    if (sheetBtnIcon) sheetBtnIcon.className = "fa-solid fa-expand";
+    if (mobileToggleBtn) mobileToggleBtn.innerHTML = '<i class="fa-solid fa-map"></i> Xem bản đồ';
+
+    setTimeout(() => {
+        if (tabWrapper && roomList) {
+            tabWrapper.scrollTo({
+                top: Math.max(roomList.offsetTop - 18, 0),
+                behavior: 'smooth'
+            });
+        }
+    }, 220);
+}
+
 function initSchoolAutocomplete() {
     const input = document.getElementById('uni-search-input');
     const suggestionsContainer = document.getElementById('uni-suggestions');
     const clearBtn = document.getElementById('clear-uni-btn');
     let debounceTimer;
+    let activeSearchController = null;
 
     // Hiển thị gợi ý mặc định khi focus vào ô tìm kiếm
     input.addEventListener('focus', () => {
@@ -150,11 +266,15 @@ function initSchoolAutocomplete() {
         const query = input.value.trim();
         clearBtn.style.display = query !== '' ? 'block' : 'none';
 
-        // Tạm thời ẩn các ghim/phòng cũ khi người dùng bắt đầu nhập tìm kiếm mới
+        if (activeSearchController) {
+            activeSearchController.abort();
+            activeSearchController = null;
+        }
+
+        // Khi người dùng bắt đầu nhập trường mới, bỏ chọn trường cũ nhưng không xóa trắng danh sách,
+        // tránh tình trạng trên điện thoại vừa gõ xong đã thấy "0 kết quả" nếu API gợi ý bị chậm.
         if (query !== '') {
             appState.selectedSchool = null;
-            appState.rooms = [];
-            renderRooms([]);
             if (appState.uniMarker) {
                 appState.map.removeLayer(appState.uniMarker);
                 appState.uniMarker = null;
@@ -162,60 +282,70 @@ function initSchoolAutocomplete() {
         }
 
         clearTimeout(debounceTimer);
+
+        if (query === '') {
+            renderSchoolSuggestions(UNIVERSITIES);
+            return;
+        }
+
+        // 1. Tìm kiếm cục bộ ngay lập tức, hỗ trợ nhập không dấu trên bàn phím điện thoại.
+        const localMatches = getLocalSchoolMatches(query);
+        renderSchoolSuggestions(localMatches);
+
         debounceTimer = setTimeout(() => {
-            if (query === '') {
+            const requestQuery = input.value.trim();
+            if (requestQuery === '') {
                 renderSchoolSuggestions(UNIVERSITIES);
                 return;
             }
 
-            // 1. Tìm kiếm cục bộ (local search) từ danh sách trường hạt giống
-            const localMatches = UNIVERSITIES.filter(uni => 
-                uni.name.toLowerCase().includes(query.toLowerCase()) || 
-                (uni.abbr && uni.abbr.toLowerCase().includes(query.toLowerCase()))
-            );
-
             // 2. Tìm kiếm qua API OpenStreetMap Nominatim (lấy 6 kết quả tại Việt Nam)
-            const apiUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}+Vietnam&format=json&limit=6`;
+            const apiUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(requestQuery)}+Vietnam&format=json&limit=6`;
+            activeSearchController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timeoutId = activeSearchController ? setTimeout(() => activeSearchController.abort(), 3500) : null;
+            const fetchOptions = activeSearchController ? { signal: activeSearchController.signal } : {};
 
-            fetch(apiUrl, {
-                headers: { 'User-Agent': 'SmartRoomFinder/1.0 (Student Room Rental Project)' }
-            })
+            fetch(apiUrl, fetchOptions)
             .then(res => res.json())
             .then(data => {
-                const apiMatches = data.map((item, index) => {
-                    const parts = item.display_name.split(',');
-                    const name = parts[0];
-                    const address = formatAddressToPostMerger(parts.slice(1, 4).join(',').trim());
-                    return {
-                        id: `osm-${index}-${Date.now()}`,
-                        name: name,
-                        abbr: name.match(/\b([A-ZĐĐ]{3,})\b/) ? name.match(/\b([A-ZĐĐ]{3,})\b/)[0] : 'ĐH/CĐ',
-                        coords: [parseFloat(item.lat), parseFloat(item.lon)],
-                        address: address
-                    };
-                });
+                // Nếu người dùng đã gõ tiếp trong lúc API trả về, bỏ qua kết quả cũ.
+                if (input.value.trim() !== requestQuery) return;
 
-                // Hợp nhất dữ liệu, loại bỏ trùng tọa độ sát nhau (dưới 100m)
-                const combined = [...localMatches];
-                apiMatches.forEach(apiSchool => {
-                    const exists = combined.some(localSchool => 
-                        getDistance(localSchool.coords[0], localSchool.coords[1], apiSchool.coords[0], apiSchool.coords[1]) < 0.1
-                    );
-                    if (!exists) {
-                        combined.push(apiSchool);
-                    }
-                });
+                const apiMatches = (Array.isArray(data) ? data : [])
+                    .map((item, index) => {
+                        const parts = String(item.display_name || '').split(',');
+                        const name = parts[0] || requestQuery;
+                        const lat = parseFloat(item.lat);
+                        const lon = parseFloat(item.lon);
+                        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
 
-                renderSchoolSuggestions(combined);
+                        const address = formatAddressToPostMerger(parts.slice(1, 4).join(',').trim());
+                        return {
+                            id: `osm-${index}-${Date.now()}`,
+                            name: name,
+                            abbr: name.match(/\b([A-ZĐĐ]{3,})\b/) ? name.match(/\b([A-ZĐĐ]{3,})\b/)[0] : 'ĐH/CĐ',
+                            coords: [lat, lon],
+                            address: address
+                        };
+                    })
+                    .filter(Boolean);
+
+                renderSchoolSuggestions(mergeSchoolSuggestions(getLocalSchoolMatches(requestQuery), apiMatches));
             })
             .catch(err => {
-                console.warn("OSM API error (offline/rate limit):", err);
-                renderSchoolSuggestions(localMatches);
+                if (err.name !== 'AbortError') {
+                    console.warn("OSM API error (offline/rate limit):", err);
+                }
+                renderSchoolSuggestions(getLocalSchoolMatches(input.value.trim()));
+            })
+            .finally(() => {
+                if (timeoutId) clearTimeout(timeoutId);
+                activeSearchController = null;
             });
-        }, 400); // Đợi 400ms sau khi ngừng gõ để tránh spam API
+        }, 350); // Đợi 350ms sau khi ngừng gõ để tránh spam API
     });
 
-    // Hỗ trợ bấm Enter để tự động chọn gợi ý đầu tiên hoặc tìm kiếm chính xác
+    // Hỗ trợ bấm Enter/Done trên bàn phím điện thoại để chọn gợi ý đầu tiên hoặc tự động chọn trường gần đúng nhất
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -225,15 +355,9 @@ function initSchoolAutocomplete() {
                 // Click gợi ý đầu tiên
                 items[0].click();
             } else {
-                const query = input.value.trim().toLowerCase();
-                if (query !== '') {
-                    const matched = UNIVERSITIES.find(uni => 
-                        uni.name.toLowerCase().includes(query) || 
-                        (uni.abbr && uni.abbr.toLowerCase().includes(query))
-                    );
-                    if (matched) {
-                        selectSchool(matched);
-                    }
+                const matched = getBestSchoolMatch(input.value.trim());
+                if (matched) {
+                    selectSchool(matched);
                 }
             }
             suggestionsContainer.style.display = 'none';
@@ -242,16 +366,12 @@ function initSchoolAutocomplete() {
 
     // Tự động khớp và chọn khi click ra ngoài hoặc đổi giá trị
     input.addEventListener('change', () => {
-        const query = input.value.trim().toLowerCase();
+        const query = input.value.trim();
         if (query === '') return;
         
-        if (appState.selectedSchool && appState.selectedSchool.name.toLowerCase() === query) return;
+        if (appState.selectedSchool && normalizeSearchText(appState.selectedSchool.name) === normalizeSearchText(query)) return;
         
-        const matched = UNIVERSITIES.find(uni => 
-            uni.name.toLowerCase() === query || 
-            uni.name.toLowerCase().includes(query) ||
-            (uni.abbr && uni.abbr.toLowerCase() === query)
-        );
+        const matched = getBestSchoolMatch(query);
         if (matched) {
             selectSchool(matched);
         }
@@ -280,7 +400,7 @@ function renderSchoolSuggestions(schools) {
     container.innerHTML = '';
 
     if (schools.length === 0) {
-        container.innerHTML = `<div style="padding: 10px 14px; font-size: 13px; color: var(--text-muted);">Không tìm thấy trường nào...</div>`;
+        container.innerHTML = `<div style="padding: 10px 14px; font-size: 13px; color: var(--text-muted); line-height: 1.4;">Không tìm thấy trường phù hợp. Hãy thử nhập tên không dấu hoặc tên viết tắt (VD: HUST, NEU, PTIT).</div>`;
         container.style.display = 'block';
         return;
     }
@@ -288,6 +408,8 @@ function renderSchoolSuggestions(schools) {
     schools.forEach(school => {
         const item = document.createElement('div');
         item.className = 'suggestion-item';
+        item.setAttribute('role', 'option');
+        item.tabIndex = 0;
         item.innerHTML = `
             <div class="school-header">
                 <span class="school-name">${school.name}</span>
@@ -296,9 +418,24 @@ function renderSchoolSuggestions(schools) {
             <div class="school-address">${formatAddressToPostMerger(school.address)}</div>
         `;
 
-        item.addEventListener('click', () => {
+        const handleSelect = (e) => {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            if (item.dataset.selected === 'true') return;
+            item.dataset.selected = 'true';
             selectSchool(school);
             container.style.display = 'none';
+        };
+
+        // pointerdown giúp chọn được gợi ý ngay trên iOS/Android trước khi input bị blur/ẩn bàn phím.
+        item.addEventListener('pointerdown', handleSelect);
+        item.addEventListener('click', handleSelect);
+        item.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                handleSelect(e);
+            }
         });
 
         container.appendChild(item);
@@ -359,6 +496,9 @@ function selectSchool(school) {
     });
     appState.uniMarker = L.marker(school.coords, { icon: uniIcon }).addTo(appState.map);
     appState.uniMarker.bindPopup(`<strong>${school.name}</strong><br>${school.address}`).openPopup();
+
+    // Trên điện thoại, mở luôn danh sách kết quả để người dùng thấy phòng trọ sau khi chọn trường.
+    revealRoomSearchResultsOnMobile();
 
     // Đồng bộ danh sách phòng trọ thực tế từ Local Server (Chợ Tốt) hoặc tạo phòng mẫu khu vực
     fetchRealRooms(school.coords[0], school.coords[1], school.id);
@@ -585,23 +725,22 @@ function fetchRealRooms(lat, lon, schoolId) {
     let serverUrl = `/api/rooms?lat=${lat}&lon=${lon}&distance=10`;
     if (provinceCode) serverUrl += `&provinceCode=${encodeURIComponent(provinceCode)}`;
     if (wardCode) serverUrl += `&wardCode=${encodeURIComponent(wardCode)}`;
-    
-    // Hiển thị hiệu ứng tải dữ liệu
-    const listContainer = document.getElementById('room-list');
-    listContainer.innerHTML = `
-        <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
-            <i class="fa-solid fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 12px; color: var(--color-primary);"></i>
-            <p>Đang đồng bộ phòng trọ thực tế từ Chợ Tốt...</p>
-        </div>
-    `;
 
-    return fetch(serverUrl)
+    // Luôn render dữ liệu khu vực trước để trên điện thoại không bị kẹt ở màn hình chờ API.
+    const localMockRooms = getRoomsForLocation(lat, lon, schoolId);
+    appState.rooms = localMockRooms;
+    applyFilters();
+
+    const syncController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = syncController ? setTimeout(() => syncController.abort(), 4500) : null;
+    const fetchOptions = syncController ? { signal: syncController.signal } : {};
+
+    return fetch(serverUrl, fetchOptions)
         .then(res => {
             if (!res.ok) throw new Error("Không thể kết nối local server");
             return res.json();
         })
         .then(realRooms => {
-            const localMockRooms = getRoomsForLocation(lat, lon, schoolId);
             if (realRooms && realRooms.length > 0) {
                 console.log(`[LIVE DATA] Đã tải ${realRooms.length} tin thật từ Chợ Tốt.`);
                 const combined = [...localMockRooms];
@@ -618,12 +757,14 @@ function fetchRealRooms(lat, lon, schoolId) {
             }
         })
         .catch(err => {
-            console.warn("Không chạy local server hoặc không có tin thật. Sử dụng dữ liệu phòng trọ phù hợp khu vực.", err.message);
-            // Lấy danh sách phòng phù hợp với vị trí trường đang chọn (Hà Giang, HCM, Cần Thơ...)
-            appState.rooms = getRoomsForLocation(lat, lon, schoolId);
-            showToast("Đang hiển thị phòng trọ thuộc khu vực trường học", false);
+            const reason = err.name === 'AbortError'
+                ? 'API phòng thật phản hồi chậm'
+                : err.message;
+            console.warn("Giữ dữ liệu phòng trọ phù hợp khu vực trường học.", reason);
+            appState.rooms = localMockRooms;
         })
         .finally(() => {
+            if (timeoutId) clearTimeout(timeoutId);
             // Áp dụng bộ lọc và vẽ marker
             applyFilters();
         });

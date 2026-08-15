@@ -10,10 +10,12 @@
     { "src": "provinces_vn.json", "use": "@vercel/static" },
     { "src": "scam_blacklist.json", "use": "@vercel/static" },
     { "src": "landlord_rooms.json", "use": "@vercel/static" },
-    { "src": "roommates.json", "use": "@vercel/static" }
+    { "src": "roommates.json", "use": "@vercel/static" },
+    { "src": "sw.js", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "server.js" },
+    { "src": "/(?:\\.env(?:\\..*)?|config\\.json|crawler\\.log|pending_rooms\\.json|server\\.js|fbScraper\\.js|vercel\\.json|\\.git(?:/.*)?|\\.vercel(?:/.*)?)", "status": 404 },
     { "src": "/(.*)", "dest": "/$1" }
   ]
 }

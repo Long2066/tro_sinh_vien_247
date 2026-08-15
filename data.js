@@ -233,6 +233,13 @@ const UNIVERSITIES = [
         id: "tnu-hg",
         name: "Phân hiệu Đại học Thái Nguyên tại Hà Giang",
         abbr: "TNU-HG",
+        aliases: [
+            "Phân hiệu ĐHTN tại Hà Giang",
+            "Phân hiệu ĐHTN Hà Giang",
+            "ĐHTN Hà Giang",
+            "DHTN HG",
+            "Đại học Thái Nguyên Hà Giang"
+        ],
         coords: [22.8123623, 104.9814349],
         address: "Đường Nguyễn Du, Tổ 16, Phường Nguyễn Trãi, Thành phố Hà Giang, Tỉnh Hà Giang"
     },

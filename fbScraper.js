@@ -18,29 +18,50 @@ function writeLog(message) {
     }
 }
 
-// Hàm chuẩn hóa và chuyển đổi định dạng Cookie (hỗ trợ cả dạng Header String và JSON Array)
+// Hàm chuẩn hóa và chuyển đổi định dạng Cookie (hỗ trợ cả dạng Header String, JSON Array, JSON Object hoặc chuỗi cắt dán)
 function formatCookie(cookieInput = '') {
     const trimmed = cookieInput.trim();
     if (!trimmed) return '';
     
-    // Nếu là định dạng JSON Array (thường xuất khẩu từ các tiện ích Chrome)
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    // 1. Thử parse JSON Array hoặc JSON Object chuẩn
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
         try {
             const parsed = JSON.parse(trimmed);
             if (Array.isArray(parsed)) {
                 return parsed.map(c => {
-                    if (c.name && c.value) {
+                    if (c && c.name && c.value !== undefined) {
                         return `${c.name}=${c.value}`;
                     }
                     return '';
                 }).filter(Boolean).join('; ');
+            } else if (typeof parsed === 'object' && parsed !== null) {
+                // Nếu dán dạng { "c_user": "...", "xs": "..." }
+                return Object.entries(parsed)
+                    .map(([k, v]) => `${k}=${v}`)
+                    .join('; ');
             }
         } catch (e) {
-            // Fallback nếu lỗi parse JSON
+            // Nếu parse JSON chuẩn thất bại do thiếu dấu ngoặc đóng/mở
         }
     }
+
+    // 2. Thử trích xuất "name": "...", "value": "..." bằng Regex nếu dán đoạn JSON bị thiếu ngoặc
+    if (trimmed.includes('"name"') && trimmed.includes('"value"')) {
+        const pairs = [];
+        const regex = /"name"\s*:\s*"([^"]+)"\s*,\s*"value"\s*:\s*"([^"]+)"/g;
+        let match;
+        while ((match = regex.exec(trimmed)) !== null) {
+            pairs.push(`${match[1]}=${match[2]}`);
+        }
+        if (pairs.length > 0) {
+            return pairs.join('; ');
+        }
+    }
+
+    // 3. Chuỗi Header thông thường (c_user=...; xs=...)
     return trimmed;
 }
+
 
 // Gửi request HTTPS Facebook Desktop
 function fetchHtml(url, cookie) {
@@ -152,7 +173,7 @@ function geocodeAddress(addressName, defaultCity = "Hà Nội") {
 async function runScraper() {
     // Tạo/Xóa log cũ cho phiên mới
     fs.writeFileSync(LOG_FILE_PATH, `--- Khởi tạo phiên cào dữ liệu Facebook mới: ${new Date().toLocaleString()} ---\n`, 'utf8');
-    writeLog("Đang tải tệp cấu hình config.json...");
+    writeLog("Đang tải cấu hình Facebook từ biến môi trường hoặc config.json...");
     
     let config = { fbCookie: "", fbGroups: [] };
     const configPath = path.join(__dirname, 'config.json');
@@ -164,18 +185,44 @@ async function runScraper() {
             writeLog("❌ Lỗi parse config.json! Kiểm tra lại định dạng file.");
             return { error: "Lỗi file config.json" };
         }
-    } else {
-        writeLog("❌ Không tìm thấy file config.json! Hãy điền cấu hình trên trang Admin trước.");
-        return { error: "Thiếu config.json" };
+    }
+
+    if (process.env.FB_COOKIE) {
+        config.fbCookie = process.env.FB_COOKIE;
+    }
+
+    if (process.env.FB_GROUPS) {
+        let groupSource = process.env.FB_GROUPS.trim();
+        for (let i = 0; i < 2; i++) {
+            try {
+                const parsedGroups = JSON.parse(groupSource);
+                if (Array.isArray(parsedGroups)) {
+                    config.fbGroups = parsedGroups.map(group => String(group).trim()).filter(Boolean);
+                    break;
+                }
+                if (typeof parsedGroups === 'string' && parsedGroups.trim()) {
+                    groupSource = parsedGroups.trim();
+                    continue;
+                }
+            } catch (e) {
+                // Cho phép cấu hình dạng nhiều dòng hoặc phân tách bằng dấu phẩy.
+            }
+
+            config.fbGroups = groupSource
+                .split(/\r?\n|,/)
+                .map(group => group.trim())
+                .filter(Boolean);
+            break;
+        }
     }
 
     if (!config.fbCookie) {
-        writeLog("❌ Chưa có Cookie Facebook! Hãy dán Cookie tại tab Admin.");
+        writeLog("❌ Chưa có Cookie Facebook! Hãy cấu hình FB_COOKIE trên Vercel hoặc dán Cookie tại tab Admin.");
         return { error: "Thiếu Cookie" };
     }
 
     if (!config.fbGroups || config.fbGroups.length === 0) {
-        writeLog("⚠️ Danh sách Group trống! Vui lòng thêm link nhóm.");
+        writeLog("⚠️ Danh sách Group trống! Vui lòng cấu hình FB_GROUPS hoặc thêm link nhóm.");
         return { success: true, count: 0 };
     }
 

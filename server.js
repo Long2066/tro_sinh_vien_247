@@ -1,4 +1,5 @@
 const http = require('http');
+const crypto = require('crypto');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
@@ -112,25 +113,95 @@ function analyzePostRisk(title, description) {
 }
 
 // Khởi tạo và lấy cấu hình hệ thống
+function getFileSystemConfig() {
+    const config = { fbCookie: "", fbGroups: [], adminSecretToken: "admin_secret_token_123" };
+    if (!fs.existsSync(configPath)) {
+        return config;
+    }
+
+    try {
+        const fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        return {
+            fbCookie: typeof fileConfig.fbCookie === 'string' ? fileConfig.fbCookie : "",
+            fbGroups: Array.isArray(fileConfig.fbGroups) ? fileConfig.fbGroups : [],
+            adminSecretToken: (typeof fileConfig.adminSecretToken === 'string' && fileConfig.adminSecretToken.trim()) ? fileConfig.adminSecretToken.trim() : "admin_secret_token_123"
+        };
+    } catch (e) {
+        console.warn("[SERVER] Lỗi đọc config.json:", e.message);
+        return config;
+    }
+}
+
+function parseEnvList(value) {
+    if (!value || typeof value !== 'string') {
+        return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    let listSource = trimmed;
+    try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+            return parsed.map(item => String(item).trim()).filter(Boolean);
+        }
+        if (typeof parsed === 'string') {
+            listSource = parsed;
+        }
+    } catch (e) {
+        // Cho phép cấu hình dạng nhiều dòng hoặc phân tách bằng dấu phẩy.
+    }
+
+    return listSource.split(/\r?\n|,/).map(item => item.trim()).filter(Boolean);
+}
+
 function getSystemConfig() {
-    let config = { fbCookie: "", fbGroups: [], adminSecretToken: "" };
-    if (fs.existsSync(configPath)) {
-        try {
-            config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        } catch (e) {}
+    const fileConfig = getFileSystemConfig();
+    const envFbGroups = parseEnvList(process.env.FB_GROUPS);
+
+    return {
+        fbCookie: process.env.FB_COOKIE || fileConfig.fbCookie || "",
+        fbGroups: envFbGroups || fileConfig.fbGroups || [],
+        adminSecretToken: process.env.ADMIN_SECRET_TOKEN || fileConfig.adminSecretToken || "admin_secret_token_123"
+    };
+}
+
+
+function getSanitizedSystemConfig(config = getSystemConfig()) {
+    return {
+        fbGroups: Array.isArray(config.fbGroups) ? config.fbGroups : [],
+        configured: {
+            facebookCookie: Boolean(config.fbCookie),
+            adminToken: Boolean(config.adminSecretToken)
+        },
+        sources: {
+            facebookCookie: process.env.FB_COOKIE ? 'environment' : (config.fbCookie ? 'config-file' : 'missing'),
+            facebookGroups: process.env.FB_GROUPS ? 'environment' : ((config.fbGroups || []).length ? 'config-file' : 'missing'),
+            adminToken: process.env.ADMIN_SECRET_TOKEN ? 'environment' : (config.adminSecretToken ? 'config-file' : 'missing')
+        }
+    };
+}
+
+function safeTokenEquals(token, expectedToken) {
+    const tokenBuffer = Buffer.from(String(token));
+    const expectedBuffer = Buffer.from(String(expectedToken));
+    if (tokenBuffer.length !== expectedBuffer.length) {
+        return false;
     }
-    if (!config.adminSecretToken) {
-        config.adminSecretToken = "admin_secret_token_123";
-        try {
-            fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
-        } catch (e) {}
-    }
-    return config;
+    return crypto.timingSafeEqual(tokenBuffer, expectedBuffer);
 }
 
 // Kiểm tra mã Token bảo mật của Admin
 function checkAdminToken(req) {
     const config = getSystemConfig();
+    const expectedToken = String(config.adminSecretToken || '').trim();
+    if (!expectedToken) {
+        return false;
+    }
+
     const authHeader = req.headers['authorization'];
     let token = '';
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -138,12 +209,21 @@ function checkAdminToken(req) {
     } else {
         token = req.headers['x-admin-token'] || '';
     }
-    return token === config.adminSecretToken;
+
+    token = String(token).trim();
+    if (!token) {
+        return false;
+    }
+
+    return safeTokenEquals(token, expectedToken);
 }
 
 // Phản hồi lỗi chưa xác thực
 function sendUnauthorized(res) {
-    res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.writeHead(401, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store'
+    });
     res.end(JSON.stringify({ error: 'Unauthorized. Mã token bảo mật không hợp lệ hoặc thiếu!' }));
 }
 
@@ -350,7 +430,8 @@ const requestHandler = async (req, res) => {
     };
 
     // Kiểm tra bảo mật cho tất cả các API Admin
-    if (pathname.startsWith('/api/admin')) {
+    const isAdminApi = pathname === '/api/admin' || pathname.startsWith('/api/admin/');
+    if (isAdminApi) {
         if (!checkAdminToken(req)) {
             sendUnauthorized(res);
             return;
@@ -590,29 +671,42 @@ const requestHandler = async (req, res) => {
         return;
     }
 
-    // 1.1. API ADMIN: Lấy cấu hình cài đặt
+    // 1.1. API ADMIN: Lấy cấu hình cài đặt đã được che dữ liệu nhạy cảm
     if (pathname === '/api/admin/config' && req.method === 'GET') {
-        const config = getSystemConfig();
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify(config));
+        res.writeHead(200, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store'
+        });
+        res.end(JSON.stringify(getSanitizedSystemConfig()));
         return;
     }
 
-    // 1.2. API ADMIN: Lưu cấu hình cài đặt
+    // 1.2. API ADMIN: Lưu cấu hình cài đặt, không ghi đè secret đang quản lý bằng biến môi trường
     if (pathname === '/api/admin/config' && req.method === 'POST') {
         try {
             const body = await getRequestBody(req);
-            const newConfig = JSON.parse(body);
-            
-            const oldConfig = getSystemConfig();
-            if (!newConfig.adminSecretToken) {
-                newConfig.adminSecretToken = oldConfig.adminSecretToken;
+            const submittedConfig = JSON.parse(body);
+            const configToSave = getFileSystemConfig();
+
+            if (Array.isArray(submittedConfig.fbGroups)) {
+                configToSave.fbGroups = submittedConfig.fbGroups;
             }
+
+            if (!process.env.FB_COOKIE && typeof submittedConfig.fbCookie === 'string' && submittedConfig.fbCookie.trim()) {
+                configToSave.fbCookie = submittedConfig.fbCookie.trim();
+            }
+
+            if (!process.env.ADMIN_SECRET_TOKEN && typeof submittedConfig.adminSecretToken === 'string' && submittedConfig.adminSecretToken.trim()) {
+                configToSave.adminSecretToken = submittedConfig.adminSecretToken.trim();
+            }
+
+            fs.writeFileSync(configPath, JSON.stringify(configToSave, null, 2), 'utf8');
             
-            fs.writeFileSync(configPath, JSON.stringify(newConfig, null, 2), 'utf8');
-            
-            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ success: true }));
+            res.writeHead(200, {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Cache-Control': 'no-store'
+            });
+            res.end(JSON.stringify({ success: true, config: getSanitizedSystemConfig() }));
         } catch (e) {
             res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ error: 'Lỗi ghi cấu hình', details: e.message }));
@@ -972,7 +1066,38 @@ const requestHandler = async (req, res) => {
     }
 
     // 2. PHỤC VỤ CÁC FILE STATIC (Giao diện Web)
-    let filePath = path.join(__dirname, pathname === '/' ? 'index.html' : pathname);
+    let safePathname = pathname;
+    try {
+        safePathname = decodeURIComponent(pathname);
+    } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Bad Request');
+        return;
+    }
+
+    const blockedStaticFiles = new Set([
+        'config.json',
+        'crawler.log',
+        'pending_rooms.json',
+        'server.js',
+        'fbscraper.js',
+        'vercel.json'
+    ]);
+    const requestedSegments = safePathname.split('/').filter(Boolean);
+    const requestedBaseName = requestedSegments.length ? requestedSegments[requestedSegments.length - 1].toLowerCase() : '';
+
+    if (
+        safePathname.includes('\0') ||
+        safePathname.includes('..') ||
+        requestedSegments.some(segment => segment.startsWith('.')) ||
+        blockedStaticFiles.has(requestedBaseName)
+    ) {
+        res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h1>404 Not Found</h1><p>File không tồn tại trên Server.</p>');
+        return;
+    }
+
+    let filePath = path.join(__dirname, safePathname === '/' ? 'index.html' : safePathname);
     
     // Bảo vệ bảo mật thư mục
     if (!filePath.startsWith(__dirname)) {
