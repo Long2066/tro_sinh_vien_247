@@ -376,13 +376,18 @@
 
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                             <div class="form-group">
-                                <label for="post-phone">Số điện thoại liên hệ (*)</label>
-                                <input type="text" id="post-phone" placeholder="VD: 0987654321" required>
+                                <label for="post-phone">Số điện thoại liên hệ (Hoặc để trống nếu dùng FB)</label>
+                                <input type="text" id="post-phone" placeholder="VD: 0987654321">
                             </div>
                             <div class="form-group">
                                 <label for="post-owner-name">Tên người liên hệ (*)</label>
                                 <input type="text" id="post-owner-name" placeholder="VD: Anh Nam" required>
                             </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="post-fb-url">Liên kết Facebook cá nhân (Tùy chọn)</label>
+                            <input type="url" id="post-fb-url" placeholder="https://facebook.com/trang-ca-nhan-cua-ban">
                         </div>
 
                         <div class="form-group">
@@ -424,33 +429,21 @@
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="Heater"> Nóng lạnh</label>
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="Fridge"> Tủ lạnh</label>
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="Balcony"> Ban công</label>
-                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="Kitchen"> Bếp nấu</label>
+                                <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="Kitchen"> Bếp riêng</label>
                                 <label style="display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer;"><input type="checkbox" value="WashingMachine"> Máy giặt</label>
                             </div>
                         </div>
 
                         <div class="form-group">
                             <label for="post-desc">Mô tả bổ sung</label>
-                            <textarea id="post-desc" placeholder="Chi tiết thời gian đi lại, điện nước, gửi xe..." style="height: 60px; resize: none;"></textarea>
+                            <textarea id="post-desc" placeholder="Giờ giấc tự do, điện nước, khu vực để xe..." style="height: 60px;"></textarea>
                         </div>
-                    </div>
 
-                    <!-- Cột phải: Bản đồ định vị -->
-                    <div style="display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0;">
-                        <div class="form-group" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0;">
-                            <label style="font-weight: 600; margin-bottom: 6px;">Chọn vị trí ghim trên bản đồ (*)</label>
-                            <div id="post-mini-map" style="flex: 1; min-height: 420px; border-radius: 12px; border: 1px solid var(--border-color); z-index: 1;"></div>
-                            <span class="input-hint" id="post-map-hint" style="margin-top: 8px; line-height: 1.4;"><i class="fa-solid fa-map-location-dot"></i> Di chuyển bản đồ và click chọn đúng vị trí nhà trọ của bạn. Tọa độ và địa chỉ chi tiết sẽ được tự động điền sang bên trái.</span>
-                        </div>
-                    </div>
-
+                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 10px;">
+                            <i class="fa-solid fa-paper-plane"></i> Gửi Đăng Tin Phòng Trọ
+                        </button>
+                    </form>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn" style="background: rgba(255,255,255,0.05); color: var(--text-secondary);" id="cancel-post-btn">Hủy bỏ</button>
-                <button class="btn btn-primary" id="submit-post-btn" style="background: var(--color-primary); color: white; display: flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid fa-paper-plane"></i> Gửi Yêu Cầu Đăng Tin
-                </button>
             </div>
         </div>
     </div>
@@ -484,17 +477,17 @@
     </div>
 
     <!-- MODAL CHI TIẾT PHÒNG TRỌ -->
-    <div class="modal-overlay" id="room-details-modal">
-        <div class="modal-card" style="width: 550px; max-width: 92vw;">
+    <div class="modal-overlay" id="room-detail-modal">
+        <div class="modal-card" style="width: 600px; max-width: 95%;">
             <div class="modal-header">
                 <h3 class="modal-title" id="detail-title">Chi Tiết Phòng Trọ</h3>
-                <button class="close-modal" id="close-detail-modal-btn">&times;</button>
+                <button class="modal-close" id="close-detail-modal-btn"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding-right: 4px;">
-                <!-- Room Images Carousel -->
-                <div id="detail-images-container" style="display: none; margin-bottom: 15px;">
-                    <div id="detail-images" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;">
-                        <!-- Dynamic images will be inserted here -->
+            <div class="modal-body">
+                <!-- Images Carousel / Container -->
+                <div id="detail-images-container" style="margin-bottom: 15px; position: relative;">
+                    <div id="detail-images" style="display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px;">
+                        <!-- Dynamic images -->
                     </div>
                 </div>
 
@@ -511,7 +504,7 @@
                     </div>
                     <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px;">
                         <span style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">TIỀN ĐẶT CỌC</span>
-                        <span id="detail-deposit" style="font-family: var(--font-heading); font-size: 20px; font-weight: 700; color: var(--text-primary);">-</span>
+                        <span id="detail-deposit" style="font-family: var(--font-heading); font-size: 20px; font-weight: 700; color: var(--color-primary);">-</span>
                     </div>
                 </div>
 
@@ -545,6 +538,9 @@
                     <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                         <a href="#" class="btn" id="btn-call-phone" style="background: #22c55e; color: white; padding: 8px 12px; font-size: 12px; text-decoration: none; font-weight: 600;">
                             <i class="fa-solid fa-phone"></i> Gọi điện
+                        </a>
+                        <a href="#" target="_blank" class="btn" id="btn-fb-contact" style="background: #1877f2; color: white; padding: 8px 12px; font-size: 12px; text-decoration: none; font-weight: 600; display: none;">
+                            <i class="fa-brands fa-facebook"></i> Facebook
                         </a>
                         <a href="#" target="_blank" class="btn" id="btn-zalo-contact" style="background: #2563eb; color: white; padding: 8px 12px; font-size: 12px; text-decoration: none; font-weight: 600;">
                             <i class="fa-solid fa-comment-dots"></i> Zalo

@@ -1154,20 +1154,22 @@ const requestHandler = async (req, res) => {
             const body = await getRequestBody(req);
             const newRoom = JSON.parse(body);
 
-            if (!newRoom.title || newRoom.price === undefined || newRoom.price === null || !newRoom.contactPhone || !newRoom.coords || !newRoom.address) {
+            if (!newRoom.title || newRoom.price === undefined || newRoom.price === null || (!newRoom.contactPhone && !newRoom.fbUrl) || !newRoom.coords || !newRoom.address) {
                 res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(JSON.stringify({ error: 'Thiếu các thông tin bắt buộc!' }));
+                res.end(JSON.stringify({ error: 'Thiếu các thông tin bắt buộc (Tiêu đề, Giá, Số điện thoại hoặc Link Facebook, Địa chỉ)!' }));
                 return;
             }
 
             // Kiểm tra Blacklist SĐT
             const blacklist = getScamBlacklist();
-            const cleanedPhone = newRoom.contactPhone.replace(/[\s\.-]/g, '');
-            const isBlacklisted = blacklist.some(b => b.phone.replace(/[\s\.-]/g, '') === cleanedPhone);
-            if (isBlacklisted) {
-                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-                res.end(JSON.stringify({ error: 'Số điện thoại này đã bị báo cáo lừa đảo trên hệ thống! Không thể gửi tin.' }));
-                return;
+            const cleanedPhone = (newRoom.contactPhone || '').replace(/[\s\.-]/g, '');
+            if (cleanedPhone) {
+                const isBlacklisted = blacklist.some(b => b.phone.replace(/[\s\.-]/g, '') === cleanedPhone);
+                if (isBlacklisted) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    res.end(JSON.stringify({ error: 'Số điện thoại này đã bị báo cáo lừa đảo trên hệ thống! Không thể gửi tin.' }));
+                    return;
+                }
             }
 
             // Lưu các hình ảnh phòng trọ tải lên nếu có
@@ -1200,7 +1202,8 @@ const requestHandler = async (req, res) => {
                 deposit: parseFloat(newRoom.deposit || newRoom.price),
                 address: newRoom.address,
                 coords: [parseFloat(newRoom.coords[0]), parseFloat(newRoom.coords[1])],
-                contactPhone: newRoom.contactPhone,
+                contactPhone: newRoom.contactPhone || '',
+                fbUrl: newRoom.fbUrl || '',
                 ownerType: 'owner',
                 ownerName: newRoom.ownerName || 'Chủ trọ',
                 rating: 5.0,
@@ -1265,7 +1268,8 @@ const requestHandler = async (req, res) => {
                 deposit: room.deposit,
                 address: room.address,
                 coords: room.coords,
-                contactPhone: room.contactPhone,
+                contactPhone: room.contactPhone || '',
+                fbUrl: room.fbUrl || '',
                 ownerType: room.ownerType,
                 ownerName: room.ownerName,
                 rating: room.rating,

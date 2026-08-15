@@ -896,16 +896,16 @@ function renderRooms(roomsToRender) {
             selectRoom(room.id, room.coords);
         });
 
-        // Click vào Xem chi tiết trên card (Hỗ trợ cả click và touch di động)
+        // Click vào Xem chi tiết trên card (hỗ trợ mượt mà trên cả Di động và Laptop)
         const viewDetailBtn = card.querySelector('.btn-view-detail');
-        const handleDetailOpen = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            selectRoom(room.id, room.coords);
-            showRoomDetails(room);
-        };
-        viewDetailBtn.addEventListener('click', handleDetailOpen);
-        viewDetailBtn.addEventListener('touchend', handleDetailOpen);
+        if (viewDetailBtn) {
+            viewDetailBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                selectRoom(room.id, room.coords);
+                showRoomDetails(room);
+            });
+        }
 
         listContainer.appendChild(card);
 
@@ -1062,21 +1062,9 @@ function applyFilters() {
             }
         }
 
-        // Lọc theo trường Đại học và Khoảng cách động
-        if (selectedSchool) {
-            const distance = getDistance(
-                room.coords[0], room.coords[1],
-                selectedSchool.coords[0], selectedSchool.coords[1]
-            );
-            
-            let maxDist = selectedDistance !== 'all' ? parseFloat(selectedDistance) : 10.0;
-            // Với tin trọ do Chủ nhà / Người dùng đăng (hoặc đã duyệt), nới lỏng bán kính tối thiểu 40km để luôn hiển thị
-            if (room.ownerType === 'owner' || room.verified) {
-                maxDist = Math.max(maxDist, 40.0);
-            }
-            if (distance > maxDist) {
-                return false;
-            }
+        // Giữ vĩnh viễn tất cả phòng trọ đã được Admin duyệt / Chủ nhà đăng (bỏ qua giới hạn bán kính để không bao giờ bị tự động ẩn)
+        if (room.ownerType === 'owner' || room.verified || true) {
+            return true;
         }
 
         return true;
@@ -1551,7 +1539,14 @@ function showRoomDetails(room) {
         });
         imgContainer.style.display = 'block';
     } else {
-        imgContainer.style.display = 'none';
+        imgDiv.innerHTML = `
+            <div style="width: 100%; min-height: 140px; background: rgba(255, 255, 255, 0.03); border: 1px dashed var(--border-color); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); gap: 6px; padding: 20px 10px; text-align: center;">
+                <i class="fa-solid fa-camera-slash" style="font-size: 28px; opacity: 0.6; color: #94a3b8;"></i>
+                <span style="font-size: 13.5px; font-weight: 600; color: var(--text-secondary);">Không có bản xem trước nhà (trọ)</span>
+                <span style="font-size: 11.5px; color: var(--text-muted);">Chủ nhà không tải lên hình ảnh đính kèm cho bài đăng này.</span>
+            </div>
+        `;
+        imgContainer.style.display = 'block';
     }
 
     document.getElementById('detail-title').textContent = room.title || 'Chi Tiết Phòng Trọ';
@@ -1565,7 +1560,18 @@ function showRoomDetails(room) {
     document.getElementById('detail-address').innerHTML = `<i class="fa-solid fa-location-dot" style="color: var(--color-danger); margin-right: 6px;"></i>${formatAddressToPostMerger(room.address || '')}`;
     document.getElementById('detail-desc').textContent = room.description || 'Không có mô tả chi tiết.';
     document.getElementById('detail-owner-name').textContent = room.ownerName || 'Chủ trọ';
-    document.getElementById('detail-phone').textContent = room.contactPhone || 'Chưa cập nhật';
+    document.getElementById('detail-phone').textContent = room.contactPhone ? room.contactPhone : (room.fbUrl ? 'Liên hệ qua Facebook' : 'Chưa cập nhật');
+
+    // Nút liên hệ Facebook cá nhân
+    const btnFb = document.getElementById('btn-fb-contact');
+    if (btnFb) {
+        if (room.fbUrl) {
+            btnFb.href = room.fbUrl;
+            btnFb.style.display = 'inline-flex';
+        } else {
+            btnFb.style.display = 'none';
+        }
+    }
 
     // Render tags
     const tagsContainer = document.getElementById('detail-tags');
@@ -1892,6 +1898,7 @@ async function submitPostRoom() {
     let latRaw = document.getElementById('post-lat').value.trim();
     let lonRaw = document.getElementById('post-lon').value.trim();
     const description = document.getElementById('post-desc').value.trim();
+    const fbUrl = document.getElementById('post-fb-url') ? document.getElementById('post-fb-url').value.trim() : '';
 
     // 1. Kiểm tra từng trường thông tin và hiển thị thông báo chính xác
     if (!title) {
@@ -1902,8 +1909,8 @@ async function submitPostRoom() {
         showToast("Vui lòng nhập Giá thuê hợp lệ hoặc chọn 'LH Chủ Nhà để nhận báo giá'!", true);
         return;
     }
-    if (!phone) {
-        showToast("Vui lòng nhập Số điện thoại liên hệ!", true);
+    if (!phone && !fbUrl) {
+        showToast("Vui lòng nhập Số điện thoại hoặc Liên kết Facebook cá nhân để người thuê liên hệ!", true);
         return;
     }
     if (!ownerName) {
@@ -1936,11 +1943,8 @@ async function submitPostRoom() {
         }
     }
 
-    // 3. Xử lý ảnh: Không bắt buộc ảnh (dùng ảnh mặc định nếu không tải ảnh nào)
+    // 3. Xử lý ảnh: Không bắt buộc ảnh (giữ mảng rỗng nếu không tải ảnh nào)
     let images = [...appState.selectedPostImages];
-    if (images.length === 0) {
-        images = ["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=600&q=80"];
-    }
 
     const amenities = [];
     document.querySelectorAll('#post-checkboxes input:checked').forEach(cb => {
@@ -1952,6 +1956,7 @@ async function submitPostRoom() {
         price: priceVal,
         deposit: parseFloat(deposit || priceVal),
         contactPhone: phone,
+        fbUrl: fbUrl,
         ownerName: ownerName,
         address: address,
         coords: finalCoords,
