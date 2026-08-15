@@ -783,16 +783,17 @@ const requestHandler = async (req, res) => {
             console.error("[ERROR] Lỗi đọc tin trọ Facebook:", e.message);
         }
 
-        // C. Nạp thêm tin đăng từ Chủ trọ (lưu ở file landlord_rooms.json)
+        // C. Nạp thêm tin đăng từ Chủ trọ (lưu ở file landlord_rooms.json hoặc bộ nhớ RAM)
         try {
             const landlordRooms = getLandlordRooms();
             const filteredLandlordRooms = landlordRooms.filter(room => {
+                if (!Array.isArray(room.coords) || room.coords.length < 2) return true;
                 const distanceToTarget = Math.sqrt(
                     Math.pow(room.coords[0] - lat, 2) + Math.pow(room.coords[1] - lon, 2)
                 ) * 111.12;
 
                 room.nearbyUnis = [{ id: "selected-school", distance: parseFloat(distanceToTarget.toFixed(2)) }];
-                return distanceToTarget <= dist;
+                return distanceToTarget <= Math.max(dist, 60);
             });
             combinedRooms = combinedRooms.concat(filteredLandlordRooms);
             console.log(`[API] Đã gộp thêm ${filteredLandlordRooms.length} tin phòng trọ của Chủ trọ đăng.`);
