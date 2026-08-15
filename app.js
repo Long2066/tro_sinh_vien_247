@@ -770,94 +770,12 @@ function fetchRealRooms(lat, lon, schoolId) {
         });
 }
 
-// Hàm sinh danh sách phòng trọ cho các trường xa Hà Nội (Đảm bảo khu vực nào cũng có trọ chính xác)
+// Hàm lấy danh sách phòng trọ bổ sung cho vị trí (Chỉ trả về phòng thật nếu có)
 function getRoomsForLocation(lat, lon, schoolId) {
-    // 1. Kiểm tra xem trong MOCK_ROOMS có phòng nào nằm trong vòng 15km quanh trường không
-    const nearby = MOCK_ROOMS.filter(room => {
+    return MOCK_ROOMS.filter(room => {
         const d = getDistance(room.coords[0], room.coords[1], lat, lon);
         return d <= 10.0;
     });
-
-    if (nearby.length > 0) {
-        return nearby;
-    }
-
-    // 2. Nếu trường nằm ở tỉnh/thành khác (ví dụ: Hà Giang, TP.HCM, Thái Nguyên, Đà Nẵng, Cần Thơ...), 
-    // tự động tạo danh sách phòng mẫu chuẩn tọa độ & địa chỉ khu vực đó!
-    const schoolObj = UNIVERSITIES.find(u => u.id === schoolId) || appState.selectedSchool;
-    const schoolName = schoolObj ? schoolObj.name : 'Trường học';
-    const rawAddr = schoolObj ? schoolObj.address : 'Khu vực trường';
-
-    return [
-        {
-            id: `auto-${schoolId}-1`,
-            title: `Phòng trọ khép kín mới xây ngay sát ${schoolName}`,
-            price: 1800000,
-            deposit: 1800000,
-            address: `Ngõ 15 ${rawAddr}`,
-            coords: [lat + 0.0025, lon + 0.0018],
-            contactPhone: "0988123456",
-            ownerType: "owner",
-            ownerName: "Bác Hòa (Chủ nhà)",
-            rating: 4.8,
-            amenities: ["AC", "Wifi", "Bed", "Wardrobe", "Heater"],
-            description: `Phòng trọ rộng 20m2 khép kín, giờ giấc tự do, cách ${schoolName} chỉ 300m đi bộ. Đầy đủ điều hòa, nóng lạnh, wifi tốc độ cao.`,
-            nearbyUnis: [{ id: schoolId, distance: 0.3 }],
-            verified: true,
-            tags: ["Gần trường", "Không chung chủ", "Giờ tự do"]
-        },
-        {
-            id: `auto-${schoolId}-2`,
-            title: `Căn hộ studio full đồ ban công thoáng mát gần ${schoolName}`,
-            price: 2500000,
-            deposit: 2500000,
-            address: `Số 88 ${rawAddr}`,
-            coords: [lat - 0.0031, lon - 0.0024],
-            contactPhone: "0912999888",
-            ownerType: "owner",
-            ownerName: "Anh Nam Manager",
-            rating: 4.6,
-            amenities: ["AC", "Wifi", "Bed", "Wardrobe", "Heater", "Fridge", "Balcony"],
-            description: `Căn hộ mini thiết kế hiện đại có ban công phơi đồ rộng rãi, chỉ cách ${schoolName} 500m. Có thang máy, khóa cửa vân tay bảo mật.`,
-            nearbyUnis: [{ id: schoolId, distance: 0.5 }],
-            verified: true,
-            tags: ["Có ban công", "Thang máy", "Khóa vân tay"]
-        },
-        {
-            id: `auto-${schoolId}-3`,
-            title: `Phòng trọ ở ghép giá rẻ sinh viên cạnh ${schoolName}`,
-            price: 1200000,
-            deposit: 1000000,
-            address: `Ngách 42 ${rawAddr}`,
-            coords: [lat + 0.0042, lon - 0.0015],
-            contactPhone: "0355666777",
-            ownerType: "owner",
-            ownerName: "Cô Hương",
-            rating: 4.5,
-            amenities: ["Wifi", "Bed", "Wardrobe", "Heater"],
-            description: `Phòng sạch sẽ yên tĩnh phù hợp cho sinh viên học tập. Điện nước giá dân, chủ nhà thân thiện.`,
-            nearbyUnis: [{ id: schoolId, distance: 0.6 }],
-            verified: true,
-            tags: ["Giá rẻ", "Tiện đi bộ"]
-        },
-        {
-            id: `auto-${schoolId}-4`,
-            title: `Chung cư mini 25m2 có bếp riêng gần ${schoolName}`,
-            price: 2200000,
-            deposit: 2200000,
-            address: `Ngõ 102 ${rawAddr}`,
-            coords: [lat - 0.0018, lon + 0.0035],
-            contactPhone: "0977444333",
-            ownerType: "broker",
-            ownerName: "Anh Tuấn Môi Giới",
-            rating: 4.2,
-            amenities: ["AC", "Wifi", "Bed", "Wardrobe", "Heater", "Kitchen", "WashingMachine"],
-            description: `Tòa nhà mới bàn giao, đầy đủ tiện nghi bếp riêng, máy giặt chung. An ninh đảm bảo 24/7.`,
-            nearbyUnis: [{ id: schoolId, distance: 0.4 }],
-            verified: false,
-            tags: ["Bếp riêng", "Máy giặt"]
-        }
-    ];
 }
 
 // 5. Render danh sách phòng trọ & hiển thị ghim (Markers) lên bản đồ
@@ -875,9 +793,10 @@ function renderRooms(roomsToRender) {
 
     if (roomsToRender.length === 0) {
         listContainer.innerHTML = `
-            <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
-                <i class="fa-solid fa-circle-question" style="font-size: 32px; margin-bottom: 12px; color: var(--text-muted);"></i>
-                <p>Không tìm thấy phòng trọ nào phù hợp với bộ lọc của bạn.</p>
+            <div style="text-align: center; padding: 45px 20px; color: var(--text-muted);">
+                <i class="fa-solid fa-house-circle-xmark" style="font-size: 38px; margin-bottom: 12px; color: #ef4444;"></i>
+                <p style="font-size: 15px; font-weight: 600; color: var(--text-primary);">Hiện chưa có phòng trọ nào được đăng tải</p>
+                <p style="font-size: 12px; margin-top: 6px; color: var(--text-muted);">Chưa có tin trọ thực tế nào được cào về hoặc do chủ nhà đăng trong khu vực này.</p>
             </div>
         `;
         return;

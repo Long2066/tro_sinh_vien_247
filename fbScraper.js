@@ -362,8 +362,9 @@ async function runScraper() {
                 const postUrl = `https://facebook.com/groups/${groupId}/permalink/${postId.replace('fb-', '')}`;
                 const images = post.images;
 
-                // Tránh ghi đè tin trùng lặp
-                if (allScrapedRooms.some(r => r.id === postId)) {
+                // Yêu cầu 2: Nếu không phát hiện số điện thoại liên hệ thì KHÔNG LẤY tin Facebook
+                if (!contactPhone || !contactPhone.trim() || contactPhone.length < 9) {
+                    writeLog(`⏭️ Bỏ qua bài đăng Facebook ${postId} do KHÔNG tìm thấy số điện thoại liên hệ.`);
                     continue;
                 }
 
