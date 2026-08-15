@@ -260,17 +260,22 @@ async function initFirestoreCache() {
     }
 }
 
-// Lấy danh sách phòng trọ do chủ nhà đăng ký (cache-first, Firestore fallback)
+// Lấy danh sách phòng trọ do chủ nhà đăng ký (luôn đọc Firestore mới nhất)
 async function getLandlordRooms() {
-    if (inMemoryLandlordRooms !== null) {
+    try {
+        const fsRooms = await fireDb.getFirestoreLandlordRooms();
+        if (fsRooms !== null && fsRooms.length > 0) {
+            inMemoryLandlordRooms = fsRooms;
+            return fsRooms;
+        }
+    } catch (e) {
+        console.error("[FIREBASE] Lỗi đọc Firestore landlord_rooms:", e.message);
+    }
+
+    if (inMemoryLandlordRooms !== null && inMemoryLandlordRooms.length > 0) {
         return inMemoryLandlordRooms;
     }
-    // Thử đọc từ Firestore trước
-    const fsRooms = await fireDb.getFirestoreLandlordRooms();
-    if (fsRooms !== null && fsRooms.length > 0) {
-        inMemoryLandlordRooms = fsRooms;
-        return inMemoryLandlordRooms;
-    }
+
     // Fallback: đọc file JSON
     if (fs.existsSync(landlordRoomsPath)) {
         try {
@@ -280,14 +285,11 @@ async function getLandlordRooms() {
             console.error("Lỗi đọc landlord_rooms.json:", e.message);
         }
     }
-    inMemoryLandlordRooms = [];
-    return inMemoryLandlordRooms;
+    return inMemoryLandlordRooms || [];
 }
 
 async function saveLandlordRooms(rooms) {
     inMemoryLandlordRooms = rooms;
-    // Ghi vĩnh viễn vào Firestore
-    // (Ghi từng room để đồng bộ chính xác)
     try {
         fs.writeFileSync(landlordRoomsPath, JSON.stringify(rooms, null, 2), 'utf8');
     } catch (e) {}
@@ -316,24 +318,27 @@ async function deleteLandlordRoom(roomId) {
 }
 
 async function getPendingRooms() {
+    try {
+        const fsPending = await fireDb.getFirestorePendingRooms();
+        if (fsPending !== null) {
+            inMemoryPendingRooms = fsPending;
+            return fsPending;
+        }
+    } catch (e) {
+        console.error("[FIREBASE] Lỗi đọc Firestore pending_rooms:", e.message);
+    }
+
     if (inMemoryPendingRooms !== null) {
         return inMemoryPendingRooms;
     }
-    // Thử đọc từ Firestore trước
-    const fsPending = await fireDb.getFirestorePendingRooms();
-    if (fsPending !== null) {
-        inMemoryPendingRooms = fsPending;
-        return inMemoryPendingRooms;
-    }
-    // Fallback file
+
     if (fs.existsSync(pendingRoomsPath)) {
         try {
             inMemoryPendingRooms = JSON.parse(fs.readFileSync(pendingRoomsPath, 'utf8'));
             return inMemoryPendingRooms;
         } catch (e) {}
     }
-    inMemoryPendingRooms = [];
-    return inMemoryPendingRooms;
+    return inMemoryPendingRooms || [];
 }
 
 async function addPendingRoom(room) {
