@@ -8,3 +8,4 @@ uploads/tmp/
 
 .vercel
 .env*
+firebase-key.json

@@ -6,6 +6,7 @@ const path = require('path');
 const url = require('url');
 const fbScraper = require('./fbScraper');
 const locationService = require('./locationService');
+const fireDb = require('./db');
 
 const PORT = 3000;
 
@@ -235,15 +236,43 @@ function sendUnauthorized(res) {
     res.end(JSON.stringify({ error: 'Unauthorized. Mã token bảo mật không hợp lệ hoặc thiếu!' }));
 }
 
-// Bộ nhớ tạm lưu danh sách phòng trọ cho môi trường Vercel (Read-only filesystem)
+// Bộ nhớ cache + Firestore vĩnh viễn
 let inMemoryLandlordRooms = null;
 let inMemoryPendingRooms = null;
+let firestoreInitialized = false;
 
-// Lấy danh sách phòng trọ do chủ nhà đăng ký
-function getLandlordRooms() {
+// Khởi tạo: nạp dữ liệu từ Firestore vào cache khi server khởi động
+async function initFirestoreCache() {
+    if (firestoreInitialized) return;
+    try {
+        const fsRooms = await fireDb.getFirestoreLandlordRooms();
+        if (fsRooms !== null && fsRooms.length > 0) {
+            inMemoryLandlordRooms = fsRooms;
+            console.log(`[FIREBASE] Đã nạp ${fsRooms.length} phòng trọ từ Firestore.`);
+        }
+        const fsPending = await fireDb.getFirestorePendingRooms();
+        if (fsPending !== null) {
+            inMemoryPendingRooms = fsPending;
+            console.log(`[FIREBASE] Đã nạp ${fsPending.length} tin chờ duyệt từ Firestore.`);
+        }
+        firestoreInitialized = true;
+    } catch (e) {
+        console.warn('[FIREBASE] Không thể nạp cache từ Firestore, dùng file fallback:', e.message);
+    }
+}
+
+// Lấy danh sách phòng trọ do chủ nhà đăng ký (cache-first, Firestore fallback)
+async function getLandlordRooms() {
     if (inMemoryLandlordRooms !== null) {
         return inMemoryLandlordRooms;
     }
+    // Thử đọc từ Firestore trước
+    const fsRooms = await fireDb.getFirestoreLandlordRooms();
+    if (fsRooms !== null && fsRooms.length > 0) {
+        inMemoryLandlordRooms = fsRooms;
+        return inMemoryLandlordRooms;
+    }
+    // Fallback: đọc file JSON
     if (fs.existsSync(landlordRoomsPath)) {
         try {
             inMemoryLandlordRooms = JSON.parse(fs.readFileSync(landlordRoomsPath, 'utf8'));
@@ -256,19 +285,48 @@ function getLandlordRooms() {
     return inMemoryLandlordRooms;
 }
 
-function saveLandlordRooms(rooms) {
+async function saveLandlordRooms(rooms) {
     inMemoryLandlordRooms = rooms;
+    // Ghi vĩnh viễn vào Firestore
+    // (Ghi từng room để đồng bộ chính xác)
     try {
         fs.writeFileSync(landlordRoomsPath, JSON.stringify(rooms, null, 2), 'utf8');
-    } catch (e) {
-        console.warn("[SERVER] Vercel read-only filesystem detected. Updated in-memory landlord rooms state.");
-    }
+    } catch (e) {}
 }
 
-function getPendingRooms() {
+async function addLandlordRoom(room) {
+    const rooms = await getLandlordRooms();
+    rooms.push(room);
+    inMemoryLandlordRooms = rooms;
+    // Ghi vĩnh viễn vào Firestore
+    await fireDb.addFirestoreLandlordRoom(room);
+    try {
+        fs.writeFileSync(landlordRoomsPath, JSON.stringify(rooms, null, 2), 'utf8');
+    } catch (e) {}
+}
+
+async function deleteLandlordRoom(roomId) {
+    let rooms = await getLandlordRooms();
+    rooms = rooms.filter(r => r.id !== roomId);
+    inMemoryLandlordRooms = rooms;
+    // Xóa vĩnh viễn khỏi Firestore
+    await fireDb.deleteFirestoreLandlordRoom(roomId);
+    try {
+        fs.writeFileSync(landlordRoomsPath, JSON.stringify(rooms, null, 2), 'utf8');
+    } catch (e) {}
+}
+
+async function getPendingRooms() {
     if (inMemoryPendingRooms !== null) {
         return inMemoryPendingRooms;
     }
+    // Thử đọc từ Firestore trước
+    const fsPending = await fireDb.getFirestorePendingRooms();
+    if (fsPending !== null) {
+        inMemoryPendingRooms = fsPending;
+        return inMemoryPendingRooms;
+    }
+    // Fallback file
     if (fs.existsSync(pendingRoomsPath)) {
         try {
             inMemoryPendingRooms = JSON.parse(fs.readFileSync(pendingRoomsPath, 'utf8'));
@@ -277,6 +335,28 @@ function getPendingRooms() {
     }
     inMemoryPendingRooms = [];
     return inMemoryPendingRooms;
+}
+
+async function addPendingRoom(room) {
+    const rooms = await getPendingRooms();
+    rooms.push(room);
+    inMemoryPendingRooms = rooms;
+    // Ghi vĩnh viễn vào Firestore
+    await fireDb.addFirestorePendingRoom(room);
+    try {
+        fs.writeFileSync(pendingRoomsPath, JSON.stringify(rooms, null, 2), 'utf8');
+    } catch (e) {}
+}
+
+async function deletePendingRoom(roomId) {
+    let rooms = await getPendingRooms();
+    rooms = rooms.filter(r => r.id !== roomId);
+    inMemoryPendingRooms = rooms;
+    // Xóa vĩnh viễn khỏi Firestore
+    await fireDb.deleteFirestorePendingRoom(roomId);
+    try {
+        fs.writeFileSync(pendingRoomsPath, JSON.stringify(rooms, null, 2), 'utf8');
+    } catch (e) {}
 }
 
 const rentedRoomsPath = path.join(__dirname, 'rented_rooms.json');
@@ -303,13 +383,12 @@ function saveRentedRoomIds(ids) {
     } catch (e) {}
 }
 
-function savePendingRooms(rooms) {
+// Legacy wrapper (không còn dùng trực tiếp)
+async function savePendingRooms(rooms) {
     inMemoryPendingRooms = rooms;
     try {
         fs.writeFileSync(pendingRoomsPath, JSON.stringify(rooms, null, 2), 'utf8');
-    } catch (e) {
-        console.warn("[SERVER] Vercel read-only filesystem detected. Updated in-memory pending rooms state.");
-    }
+    } catch (e) {}
 }
 
 // Hàm giải mã và lưu hình ảnh Base64
@@ -573,6 +652,8 @@ function trackVisit(req, pathname, query = {}) {
 
 // Hàm xử lý request HTTP chính
 const requestHandler = async (req, res) => {
+    // Khởi tạo Firestore cache (chỉ chạy 1 lần duy nhất)
+    await initFirestoreCache();
     // Cài đặt CORS Header hỗ trợ gọi Cross-Origin từ Admin Page sang Main Server
     const origin = req.headers.origin || '*';
     res.setHeader('Access-Control-Allow-Origin', origin);
@@ -801,7 +882,7 @@ const requestHandler = async (req, res) => {
 
         // C. Nạp thêm tin đăng từ Chủ trọ (lưu ở file landlord_rooms.json hoặc bộ nhớ RAM)
         try {
-            const landlordRooms = getLandlordRooms();
+            const landlordRooms = await getLandlordRooms();
             const filteredLandlordRooms = landlordRooms.filter(room => {
                 if (!Array.isArray(room.coords) || room.coords.length < 2) return true;
                 const distanceToTarget = Math.sqrt(
@@ -983,7 +1064,7 @@ const requestHandler = async (req, res) => {
 
     // 1.5. API ADMIN: Lấy tất cả phòng trọ do chủ nhà đăng ký
     if (pathname === '/api/admin/landlord-rooms' && req.method === 'GET') {
-        const rooms = getLandlordRooms();
+        const rooms = await getLandlordRooms();
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(rooms));
         return;
@@ -1012,7 +1093,7 @@ const requestHandler = async (req, res) => {
                 });
             }
 
-            const rooms = getLandlordRooms();
+            const rooms = await getLandlordRooms();
             const roomToSave = {
                 id: `ll-${Date.now()}`,
                 title: newRoom.title,
@@ -1032,8 +1113,7 @@ const requestHandler = async (req, res) => {
                 tags: ["Chính chủ", "Tin xác minh"]
             };
 
-            rooms.push(roomToSave);
-            saveLandlordRooms(rooms);
+            await addLandlordRoom(roomToSave);
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ success: true, room: roomToSave }));
@@ -1054,7 +1134,7 @@ const requestHandler = async (req, res) => {
                 return;
             }
 
-            let rooms = getLandlordRooms();
+            let rooms = await getLandlordRooms();
             const originalLength = rooms.length;
             
             // Xóa file ảnh vật lý trước khi xóa khỏi json
@@ -1075,15 +1155,13 @@ const requestHandler = async (req, res) => {
                 });
             }
 
-            rooms = rooms.filter(r => r.id !== roomId);
-
-            if (rooms.length === originalLength) {
+            if (!roomToDelete) {
                 res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ error: 'Không tìm thấy phòng trọ với ID tương ứng!' }));
                 return;
             }
 
-            saveLandlordRooms(rooms);
+            await deleteLandlordRoom(roomId);
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ success: true }));
         } catch (e) {
@@ -1145,7 +1223,6 @@ const requestHandler = async (req, res) => {
             // Phân tích rủi ro bài viết
             const riskAnalysis = analyzePostRisk(newRoom.title, newRoom.description || '');
 
-            const pendingRooms = getPendingRooms();
             const pendingRoom = {
                 id: `pending-${Date.now()}`,
                 title: newRoom.title,
@@ -1167,8 +1244,7 @@ const requestHandler = async (req, res) => {
                 submittedAt: new Date().toISOString()
             };
 
-            pendingRooms.push(pendingRoom);
-            savePendingRooms(pendingRooms);
+            await addPendingRoom(pendingRoom);
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ success: true, message: 'Đăng tin thành công! Tin đăng của bạn đang chờ Admin kiểm duyệt.' }));
@@ -1181,7 +1257,7 @@ const requestHandler = async (req, res) => {
 
     // 1.9. API ADMIN: Lấy danh sách tin đăng đang chờ duyệt
     if (pathname === '/api/admin/pending-rooms' && req.method === 'GET') {
-        const pendingRooms = getPendingRooms();
+        const pendingRooms = await getPendingRooms();
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(pendingRooms));
         return;
@@ -1200,7 +1276,7 @@ const requestHandler = async (req, res) => {
                 return;
             }
 
-            let pendingRooms = getPendingRooms();
+            let pendingRooms = await getPendingRooms();
             const roomIndex = pendingRooms.findIndex(r => r.id === roomId);
 
             if (roomIndex === -1) {
@@ -1210,7 +1286,6 @@ const requestHandler = async (req, res) => {
             }
 
             const room = pendingRooms[roomIndex];
-            const landlordRooms = getLandlordRooms();
 
             // Chuyển đổi ID và gán nhãn
             const approvedRoom = {
@@ -1231,12 +1306,11 @@ const requestHandler = async (req, res) => {
                 tags: ["Chính chủ", "Tin xác minh"]
             };
 
-            landlordRooms.push(approvedRoom);
-            saveLandlordRooms(landlordRooms);
+            // Lưu vĩnh viễn vào Firestore
+            await addLandlordRoom(approvedRoom);
 
-            // Xóa khỏi hàng đợi duyệt
-            pendingRooms.splice(roomIndex, 1);
-            savePendingRooms(pendingRooms);
+            // Xóa khỏi hàng đợi duyệt (Firestore + cache)
+            await deletePendingRoom(roomId);
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ success: true, room: approvedRoom }));
@@ -1260,7 +1334,7 @@ const requestHandler = async (req, res) => {
                 return;
             }
 
-            let pendingRooms = getPendingRooms();
+            let pendingRooms = await getPendingRooms();
             const roomIndex = pendingRooms.findIndex(r => r.id === roomId);
 
             if (roomIndex === -1) {
@@ -1275,12 +1349,14 @@ const requestHandler = async (req, res) => {
             if (Array.isArray(room.images)) {
                 room.images.forEach(imgUrl => {
                     try {
-                        const parts = imgUrl.split('/');
-                        const filename = parts[parts.length - 1];
-                        const filepath = path.join(uploadsDir, filename);
-                        if (fs.existsSync(filepath)) {
-                            fs.unlinkSync(filepath);
-                            console.log(`[SERVER] Đã xóa file ảnh phòng trọ bị từ chối: ${filename}`);
+                        if (typeof imgUrl === 'string' && imgUrl.startsWith('/uploads/')) {
+                            const parts = imgUrl.split('/');
+                            const filename = parts[parts.length - 1];
+                            const filepath = path.join(uploadsDir, filename);
+                            if (fs.existsSync(filepath)) {
+                                fs.unlinkSync(filepath);
+                                console.log(`[SERVER] Đã xóa file ảnh phòng trọ bị từ chối: ${filename}`);
+                            }
                         }
                     } catch (err) {
                         console.error("Lỗi khi xóa file ảnh phòng trọ bị từ chối:", err.message);
@@ -1288,9 +1364,8 @@ const requestHandler = async (req, res) => {
                 });
             }
 
-            // Xóa khỏi hàng đợi duyệt
-            pendingRooms.splice(roomIndex, 1);
-            savePendingRooms(pendingRooms);
+            // Xóa khỏi hàng đợi duyệt (Firestore + cache)
+            await deletePendingRoom(roomId);
 
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ success: true }));
