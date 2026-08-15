@@ -403,6 +403,127 @@ function extractPhone(body = '', defaultPhone = '') {
     return defaultPhone;
 }
 
+// Quản lý Thống kê Truy cập Real-time
+const statsFilePath = path.join(__dirname, 'stats.json');
+let inMemoryStats = {
+    totalVisits: 0,
+    dailyVisits: {},
+    uniSearches: {},
+    recentVisits: [],
+    activeSessions: {}
+};
+
+if (fs.existsSync(statsFilePath)) {
+    try {
+        const fileData = JSON.parse(fs.readFileSync(statsFilePath, 'utf8'));
+        inMemoryStats.totalVisits = fileData.totalVisits || 0;
+        inMemoryStats.dailyVisits = fileData.dailyVisits || {};
+        inMemoryStats.uniSearches = fileData.uniSearches || {};
+    } catch (e) {}
+}
+
+function saveStatsToFile() {
+    try {
+        fs.writeFileSync(statsFilePath, JSON.stringify({
+            totalVisits: inMemoryStats.totalVisits,
+            dailyVisits: inMemoryStats.dailyVisits,
+            uniSearches: inMemoryStats.uniSearches
+        }, null, 2), 'utf8');
+    } catch (e) {}
+}
+
+function parseUserAgent(ua = '') {
+    if (/iphone|ipad|ipod/i.test(ua)) return '📱 Mobile (iOS)';
+    if (/android/i.test(ua)) return '📱 Mobile (Android)';
+    if (/macintosh|mac os x/i.test(ua)) return '💻 Desktop (macOS)';
+    if (/windows/i.test(ua)) return '💻 Desktop (Windows)';
+    if (/linux/i.test(ua)) return '💻 Desktop (Linux)';
+    return '🌐 Thiết bị khác';
+}
+
+function getClientIp(req) {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) {
+        return forwarded.split(',')[0].trim();
+    }
+    return req.socket ? req.socket.remoteAddress || '127.0.0.1' : '127.0.0.1';
+}
+
+function maskIp(ip) {
+    if (!ip) return '127.0.0.x';
+    const parts = ip.split('.');
+    if (parts.length === 4) {
+        return `${parts[0]}.${parts[1]}.x.x`;
+    }
+    return ip;
+}
+
+function trackVisit(req, pathname, query = {}) {
+    if (!pathname || pathname.startsWith('/uploads/') || pathname.endsWith('.css') || pathname.endsWith('.js') || pathname.endsWith('.png') || pathname.endsWith('.jpg') || pathname.endsWith('.svg') || pathname.startsWith('/api/admin/')) {
+        return;
+    }
+
+    const now = Date.now();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const clientIp = getClientIp(req);
+    const userAgent = req.headers['user-agent'] || '';
+    const device = parseUserAgent(userAgent);
+    
+    const sessionKey = `${clientIp}_${userAgent.substring(0, 30)}`;
+    inMemoryStats.activeSessions[sessionKey] = now;
+
+    // Dọn dẹp session quá 5 phút
+    const fiveMinsAgo = now - 5 * 60 * 1000;
+    Object.keys(inMemoryStats.activeSessions).forEach(key => {
+        if (inMemoryStats.activeSessions[key] < fiveMinsAgo) {
+            delete inMemoryStats.activeSessions[key];
+        }
+    });
+
+    inMemoryStats.totalVisits++;
+    inMemoryStats.dailyVisits[todayStr] = (inMemoryStats.dailyVisits[todayStr] || 0) + 1;
+
+    let actionDetail = 'Truy cập ứng dụng';
+    if (pathname === '/api/rooms') {
+        actionDetail = 'Tìm kiếm phòng trọ';
+        const uniId = query.uniId || (query.lat ? 'Tọa độ vị trí' : null);
+        if (uniId) {
+            if (uniId.includes('tnu-hg') || uniId.includes('ha-giang')) {
+                actionDetail = 'Tìm trọ Phân hiệu ĐHTN Hà Giang';
+                inMemoryStats.uniSearches['tnu-hg'] = (inMemoryStats.uniSearches['tnu-hg'] || 0) + 1;
+            } else {
+                actionDetail = `Tìm trọ quanh trường (${uniId.toUpperCase()})`;
+                inMemoryStats.uniSearches[uniId] = (inMemoryStats.uniSearches[uniId] || 0) + 1;
+            }
+        }
+    } else if (pathname === '/api/roommates') {
+        actionDetail = 'Xem hồ sơ ở ghép';
+    } else if (pathname === '/api/reports/scam') {
+        actionDetail = 'Gửi báo cáo lừa đảo';
+    } else if (pathname === '/api/blacklist') {
+        actionDetail = 'Tra cứu danh sách lừa đảo';
+    }
+
+    const timeStr = new Date().toLocaleTimeString('vi-VN');
+    inMemoryStats.recentVisits.unshift({
+        id: 'v-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        time: timeStr,
+        date: todayStr,
+        ip: maskIp(clientIp),
+        device: device,
+        path: pathname,
+        action: actionDetail
+    });
+
+    if (inMemoryStats.recentVisits.length > 50) {
+        inMemoryStats.recentVisits.pop();
+    }
+
+    if (inMemoryStats.totalVisits % 5 === 0) {
+        saveStatsToFile();
+    }
+}
+
 // Hàm xử lý request HTTP chính
 const requestHandler = async (req, res) => {
     // Cài đặt CORS Header để frontend gọi từ file:// hoặc localhost đều được
@@ -418,6 +539,9 @@ const requestHandler = async (req, res) => {
 
     const parsedUrl = url.parse(req.url, true);
     const pathname = parsedUrl.pathname;
+
+    // Ghi nhận lượt truy cập real-time
+    trackVisit(req, pathname, parsedUrl.query);
 
     // Helper trích xuất body của request POST
     const getRequestBody = (request) => {
@@ -437,6 +561,7 @@ const requestHandler = async (req, res) => {
             return;
         }
     }
+
 
     // --- API ĐỊA GIỚI HÀNH CHÍNH ---
     if (pathname === '/api/locations/provinces' && req.method === 'GET') {
@@ -744,6 +869,34 @@ const requestHandler = async (req, res) => {
         res.end(logs);
         return;
     }
+
+    // 1.4.1. API ADMIN: Lấy thống kê truy cập real-time
+    if (pathname === '/api/admin/stats' && req.method === 'GET') {
+        const now = Date.now();
+        const fiveMinsAgo = now - 5 * 60 * 1000;
+        
+        const onlineUsersCount = Object.values(inMemoryStats.activeSessions)
+            .filter(t => t >= fiveMinsAgo).length;
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayVisitsCount = inMemoryStats.dailyVisits[todayStr] || 0;
+        const tnuHgSearches = inMemoryStats.uniSearches['tnu-hg'] || 0;
+
+        res.writeHead(200, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store'
+        });
+        res.end(JSON.stringify({
+            onlineUsers: Math.max(onlineUsersCount, 1),
+            totalVisits: Math.max(inMemoryStats.totalVisits, 1),
+            todayVisits: Math.max(todayVisitsCount, 1),
+            tnuHgSearches: tnuHgSearches,
+            uniSearches: inMemoryStats.uniSearches,
+            recentVisits: inMemoryStats.recentVisits
+        }));
+        return;
+    }
+
 
     // 1.5. API ADMIN: Lấy tất cả phòng trọ do chủ nhà đăng ký
     if (pathname === '/api/admin/landlord-rooms' && req.method === 'GET') {
