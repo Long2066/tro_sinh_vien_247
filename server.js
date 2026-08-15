@@ -559,8 +559,10 @@ function trackVisit(req, pathname, query = {}) {
 
 // Hàm xử lý request HTTP chính
 const requestHandler = async (req, res) => {
-    // Cài đặt CORS Header để frontend gọi từ file:// hoặc localhost đều được
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Cài đặt CORS Header hỗ trợ gọi Cross-Origin từ Admin Page sang Main Server
+    const origin = req.headers.origin || '*';
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Admin-Token');
 
