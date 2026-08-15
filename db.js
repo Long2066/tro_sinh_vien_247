@@ -91,9 +91,14 @@ async function getFirestorePendingRooms() {
     if (!firestore) return null;
 
     try {
-        const snapshot = await firestore.collection('pending_rooms')
-            .orderBy('submittedAt', 'desc').get();
-        return snapshot.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
+        const snapshot = await firestore.collection('pending_rooms').get();
+        const rooms = snapshot.docs.map(doc => ({ _docId: doc.id, ...doc.data() }));
+        rooms.sort((a, b) => {
+            const timeA = a.submittedAt ? new Date(a.submittedAt).getTime() : (parseInt(String(a.id).replace(/\D/g, '')) || 0);
+            const timeB = b.submittedAt ? new Date(b.submittedAt).getTime() : (parseInt(String(b.id).replace(/\D/g, '')) || 0);
+            return timeB - timeA;
+        });
+        return rooms;
     } catch (e) {
         console.error('[FIREBASE] Lỗi đọc pending_rooms:', e.message);
         return null;
