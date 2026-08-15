@@ -271,6 +271,30 @@ function getPendingRooms() {
     return inMemoryPendingRooms;
 }
 
+const rentedRoomsPath = path.join(__dirname, 'rented_rooms.json');
+let inMemoryRentedRoomIds = null;
+
+function getRentedRoomIds() {
+    if (inMemoryRentedRoomIds !== null) {
+        return inMemoryRentedRoomIds;
+    }
+    if (fs.existsSync(rentedRoomsPath)) {
+        try {
+            inMemoryRentedRoomIds = JSON.parse(fs.readFileSync(rentedRoomsPath, 'utf8'));
+            return inMemoryRentedRoomIds;
+        } catch (e) {}
+    }
+    inMemoryRentedRoomIds = [];
+    return inMemoryRentedRoomIds;
+}
+
+function saveRentedRoomIds(ids) {
+    inMemoryRentedRoomIds = ids;
+    try {
+        fs.writeFileSync(rentedRoomsPath, JSON.stringify(ids, null, 2), 'utf8');
+    } catch (e) {}
+}
+
 function savePendingRooms(rooms) {
     inMemoryPendingRooms = rooms;
     try {
@@ -785,13 +809,41 @@ const requestHandler = async (req, res) => {
             combinedRooms = combinedRooms.filter(room => {
                 if (provinceCode && room.provinceCode !== provinceCode) return false;
                 if (wardCode && room.wardCode !== wardCode) return false;
-                return true;
             });
-            console.log(`[API] Đã lọc còn lại ${combinedRooms.length} phòng theo địa giới hành chính (provinceCode: ${provinceCode}, wardCode: ${wardCode}).`);
+            console.log(`[API] Đã lọc còn lại ${combinedRooms.length} phòng theo địa giới hành chính.`);
+        }
+
+        // Lọc bỏ tất cả phòng trọ đã được báo hết/đã thuê đồng bộ trên toàn bộ thiết bị
+        const rentedIds = getRentedRoomIds();
+        if (rentedIds.length > 0) {
+            combinedRooms = combinedRooms.filter(room => !rentedIds.includes(String(room.id)));
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(combinedRooms));
+        return;
+    }
+
+    // 1.0. API NGƯỜI DÙNG: Báo cáo phòng trọ đã thuê / hết phòng (Đồng bộ toàn bộ thiết bị)
+    if (pathname === '/api/rooms/report-rented' && req.method === 'POST') {
+        try {
+            const body = await getRequestBody(req);
+            const data = JSON.parse(body);
+            if (data.roomId) {
+                const strId = String(data.roomId);
+                const rentedIds = getRentedRoomIds();
+                if (!rentedIds.includes(strId)) {
+                    rentedIds.push(strId);
+                    saveRentedRoomIds(rentedIds);
+                    console.log(`[API] Đã báo hết phòng cho ID: ${strId} (Đồng bộ server)`);
+                }
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify({ success: true, message: 'Đã báo hết phòng đồng bộ máy chủ.' }));
+        } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify({ error: 'Lỗi báo hết phòng', details: e.message }));
+        }
         return;
     }
 

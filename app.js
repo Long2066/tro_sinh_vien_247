@@ -1633,16 +1633,29 @@ function showRoomDetails(room) {
         zaloLink.href = cleanPhone ? `https://zalo.me/${cleanPhone}` : '#';
     }
 
-    // Báo cáo đã thuê action
+    // Báo cáo đã thuê action (Đồng bộ toàn bộ thiết bị qua API)
     const rentedBtn = document.getElementById('btn-report-rented');
     if (rentedBtn) {
-        rentedBtn.onclick = () => {
-            if (confirm("Xác nhận báo cáo phòng trọ này đã được thuê hoặc hết phòng? Tin đăng này sẽ lập tức ẩn khỏi bản đồ của bạn.")) {
-                appState.rentedRoomIds.push(String(room.id));
-                localStorage.setItem('rented_rooms', JSON.stringify(appState.rentedRoomIds));
+        rentedBtn.onclick = async () => {
+            if (confirm("Xác nhận báo cáo phòng trọ này đã được thuê hoặc hết phòng? Tin đăng này sẽ ẩn khỏi hệ thống trên TẤT CẢ thiết bị.")) {
+                const strId = String(room.id);
+                if (!appState.rentedRoomIds.includes(strId)) {
+                    appState.rentedRoomIds.push(strId);
+                    localStorage.setItem('rented_rooms', JSON.stringify(appState.rentedRoomIds));
+                }
+
+                // Gửi API báo cáo đồng bộ lên máy chủ
+                try {
+                    await fetch('/api/rooms/report-rented', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ roomId: room.id })
+                    });
+                } catch (e) {}
+
                 closeRoomDetailsModal();
                 applyFilters();
-                showToast("Đã ẩn phòng trọ đã thuê thành công!", false);
+                showToast("Đã ẩn phòng trọ đã thuê trên toàn hệ thống thành công!", false);
             }
         };
     }
