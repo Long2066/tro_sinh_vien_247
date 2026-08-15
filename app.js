@@ -737,35 +737,27 @@ function fetchRealRooms(lat, lon, schoolId) {
     applyFilters();
 
     const syncController = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeoutId = syncController ? setTimeout(() => syncController.abort(), 4500) : null;
+    const timeoutId = syncController ? setTimeout(() => syncController.abort(), 15000) : null;
     const fetchOptions = syncController ? { signal: syncController.signal } : {};
 
     return fetch(serverUrl, fetchOptions)
         .then(res => {
-            if (!res.ok) throw new Error("Không thể kết nối local server");
+            if (!res.ok) throw new Error("Không thể kết nối máy chủ");
             return res.json();
         })
         .then(realRooms => {
-            if (realRooms && realRooms.length > 0) {
-                console.log(`[LIVE DATA] Đã tải ${realRooms.length} tin thật từ Chợ Tốt.`);
-                const combined = [...localMockRooms];
-                realRooms.forEach(realRoom => {
-                    const exists = combined.some(mockRoom => mockRoom.title === realRoom.title);
-                    if (!exists) {
-                        combined.push(realRoom);
-                    }
-                });
-                appState.rooms = combined;
-                showToast(`Đã đồng bộ ${realRooms.length} phòng trọ thực tế!`, false);
+            if (Array.isArray(realRooms) && realRooms.length > 0) {
+                console.log(`[LIVE DATA] Đã tải ${realRooms.length} tin từ Server.`);
+                appState.rooms = realRooms;
             } else {
                 appState.rooms = localMockRooms;
             }
         })
         .catch(err => {
             const reason = err.name === 'AbortError'
-                ? 'API phòng thật phản hồi chậm'
+                ? 'API phản hồi chậm'
                 : err.message;
-            console.warn("Giữ dữ liệu phòng trọ phù hợp khu vực trường học.", reason);
+            console.warn("Giữ dữ liệu phòng trọ mặc định.", reason);
             appState.rooms = localMockRooms;
         })
         .finally(() => {
