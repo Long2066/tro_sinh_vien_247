@@ -863,131 +863,29 @@ const requestHandler = async (req, res) => {
         return;
     }
 
-    // 1. ENDPOINT API: Lấy danh sách phòng trọ thật từ Chợ Tốt + Facebook + Chủ trọ đăng trong bán kính tọa độ
+    // 1. ENDPOINT API: Lấy danh sách phòng trọ đã được Admin duyệt từ Database Firestore
     if (pathname === '/api/rooms') {
         const lat = parseFloat(parsedUrl.query.lat);
         const lon = parseFloat(parsedUrl.query.lon);
-        const dist = parseFloat(parsedUrl.query.distance) || 5;
-
-        if (isNaN(lat) || isNaN(lon)) {
-            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-            res.end(JSON.stringify({ error: 'Thiếu tọa độ vĩ độ (lat) hoặc kinh độ (lon)!' }));
-            return;
-        }
 
         let combinedRooms = [];
 
-        // A. Cào tin thật từ Chợ Tốt
-        try {
-            console.log(`[API] Đang quét tin đăng phòng trọ thật từ Chợ Tốt tại: [${lat}, ${lon}] bán kính ${dist}km...`);
-            const chototData = await fetchFromChoTot(lat, lon, dist);
-            
-            if (chototData.ads && chototData.ads.length > 0) {
-                const formattedRooms = chototData.ads.map((ad) => {
-                    const contactPhone = extractPhone(ad.body, "");
-                    const ownerType = ad.company_ad ? 'broker' : 'owner';
-                    
-                    const tags = ["Tin thực tế"];
-                    if (ad.company_ad) tags.push("Môi giới");
-                    if (amenities.includes('AC')) tags.push("Có điều hòa");
-                    if (amenities.includes('Balcony')) tags.push("Ban công");
-                    if (amenities.includes('Kitchen')) tags.push("Bếp riêng");
-                    
-                    const distanceToTarget = Math.sqrt(
-                        Math.pow(ad.latitude - lat, 2) + Math.pow(ad.longitude - lon, 2)
-                    ) * 111.12;
-
-                    return {
-                        id: `ct-${ad.ad_id}`,
-                        title: ad.subject,
-                        price: ad.price,
-                        deposit: ad.price,
-                        address: (() => {
-                            let addr = `${ad.street_name ? ad.street_name + ', ' : ''}${ad.ward_name ? ad.ward_name + ', ' : ''}${ad.area_name}`;
-                            if (addr.includes("Hà Giang") && !addr.includes("Tỉnh Hà Giang")) {
-                                addr += ", Tỉnh Hà Giang";
-                            }
-                            return addr;
-                        })(),
-                        coords: [ad.latitude, ad.longitude],
-                        contactPhone: contactPhone,
-                        ownerType: ownerType,
-                        ownerName: ad.account_name || (ad.company_ad ? "Môi giới dịch vụ" : "Chính chủ trọ"),
-                        rating: parseFloat((4.0 + Math.random() * 1.0).toFixed(1)),
-                        amenities: amenities,
-                        description: ad.body || "Không có nội dung mô tả chi tiết.",
-                        nearbyUnis: [
-                            { id: "selected-school", distance: parseFloat(distanceToTarget.toFixed(2)) }
-                        ],
-                        verified: !ad.company_ad,
-                        tags: tags
-                    };
-                });
-                combinedRooms = combinedRooms.concat(formattedRooms);
-            }
-        } catch (error) {
-            console.error("[ERROR] Lỗi gọi API Chợ Tốt:", error.message);
-        }
-
-        // B. Nạp thêm tin cào từ Facebook (từ RAM cache hoặc file JSON)
-        const fbRoomsPath = path.join(__dirname, 'facebook_rooms.json');
-        try {
-            const fbRooms = typeof fbScraper.getScrapedRooms === 'function'
-                ? fbScraper.getScrapedRooms()
-                : (fs.existsSync(fbRoomsPath) ? JSON.parse(fs.readFileSync(fbRoomsPath, 'utf8')) : []);
-
-            const filteredFbRooms = fbRooms.filter(room => {
-                const distanceToTarget = Math.sqrt(
-                    Math.pow(room.coords[0] - lat, 2) + Math.pow(room.coords[1] - lon, 2)
-                ) * 111.12;
-
-                // Gán khoảng cách động cho trường học đang chọn
-                room.nearbyUnis = [{ id: "selected-school", distance: parseFloat(distanceToTarget.toFixed(2)) }];
-                return distanceToTarget <= dist;
-            });
-            combinedRooms = combinedRooms.concat(filteredFbRooms);
-            console.log(`[API] Đã gộp thêm ${filteredFbRooms.length} tin phòng trọ cào từ Facebook.`);
-        } catch (e) {
-            console.error("[ERROR] Lỗi đọc tin trọ Facebook:", e.message);
-        }
-
-        // C. Nạp thêm tin đăng từ Chủ trọ (lưu ở file landlord_rooms.json hoặc bộ nhớ RAM)
+        // Chỉ nạp duy nhất tin đăng từ Chủ trọ / Người dùng đã được Admin phê duyệt (Lưu ở Database Firestore)
         try {
             const landlordRooms = await getLandlordRooms();
-            const filteredLandlordRooms = landlordRooms.filter(room => {
-                if (!Array.isArray(room.coords) || room.coords.length < 2) return true;
-                const distanceToTarget = Math.sqrt(
-                    Math.pow(room.coords[0] - lat, 2) + Math.pow(room.coords[1] - lon, 2)
-                ) * 111.12;
-
-                room.nearbyUnis = [{ id: "selected-school", distance: parseFloat(distanceToTarget.toFixed(2)) }];
-                return distanceToTarget <= Math.max(dist, 60);
-            });
-            combinedRooms = combinedRooms.concat(filteredLandlordRooms);
-            console.log(`[API] Đã gộp thêm ${filteredLandlordRooms.length} tin phòng trọ của Chủ trọ đăng.`);
-        } catch (e) {
-            console.error("[ERROR] Lỗi đọc landlord_rooms.json:", e.message);
-        }
-
-        // Chuẩn hóa địa chỉ và bổ sung thông tin địa giới hành chính
-        combinedRooms = combinedRooms.map(room => {
-            const std = locationService.standardizeAddress(room.address);
-            // Giữ nguyên ảnh gốc (bao gồm base64 data URI), chỉ thay thế URL localhost bị hỏng
-            const fixedImages = Array.isArray(room.images) ? room.images.map(img => {
-                if (typeof img === 'string' && img.includes('localhost:')) {
-                    return 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=600&q=80';
+            combinedRooms = landlordRooms.map(room => {
+                if (Array.isArray(room.coords) && room.coords.length >= 2 && !isNaN(lat) && !isNaN(lon)) {
+                    const distanceToTarget = Math.sqrt(
+                        Math.pow(room.coords[0] - lat, 2) + Math.pow(room.coords[1] - lon, 2)
+                    ) * 111.12;
+                    room.nearbyUnis = [{ id: "selected-school", distance: parseFloat(distanceToTarget.toFixed(2)) }];
                 }
-                return img;
-            }).filter(img => img && img.length > 0) : [];
-
-            return {
-                ...room,
-                images: fixedImages,
-                standardizedAddress: std.standardized,
-                provinceCode: std.province ? std.province.code : null,
-                wardCode: std.ward ? std.ward.code : null
-            };
-        });
+                return room;
+            });
+            console.log(`[API] Đã nạp ${combinedRooms.length} tin trọ chính thức từ Firestore.`);
+        } catch (e) {
+            console.error("[ERROR] Lỗi đọc landlord_rooms:", e.message);
+        }
 
         // Lọc theo Tỉnh/Thành hoặc Phường/Xã nếu được yêu cầu
         const provinceCode = parsedUrl.query.provinceCode;
@@ -995,21 +893,25 @@ const requestHandler = async (req, res) => {
 
         if (provinceCode || wardCode) {
             combinedRooms = combinedRooms.filter(room => {
-                if (room.ownerType === 'owner') return true;
                 if (provinceCode && room.provinceCode && room.provinceCode !== provinceCode) return false;
                 if (wardCode && room.wardCode && room.wardCode !== wardCode) return false;
                 return true;
             });
-            console.log(`[API] Đã lọc còn lại ${combinedRooms.length} phòng theo địa giới hành chính.`);
         }
 
-        // Lọc bỏ tất cả phòng trọ đã được báo hết/đã thuê đồng bộ trên toàn bộ thiết bị
+        // Lọc bỏ tất cả phòng trọ đã được báo hết/đã thuê
         const rentedIds = getRentedRoomIds();
         if (rentedIds.length > 0) {
             combinedRooms = combinedRooms.filter(room => !rentedIds.includes(String(room.id)));
         }
 
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.writeHead(200, { 
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'Access-Control-Allow-Origin': '*'
+        });
         res.end(JSON.stringify(combinedRooms));
         return;
     }
