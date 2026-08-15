@@ -264,7 +264,7 @@ async function initFirestoreCache() {
 async function getLandlordRooms() {
     try {
         const fsRooms = await fireDb.getFirestoreLandlordRooms();
-        if (fsRooms !== null && fsRooms.length > 0) {
+        if (fsRooms !== null) {
             inMemoryLandlordRooms = fsRooms;
             return fsRooms;
         }
@@ -272,7 +272,7 @@ async function getLandlordRooms() {
         console.error("[FIREBASE] Lỗi đọc Firestore landlord_rooms:", e.message);
     }
 
-    if (inMemoryLandlordRooms !== null && inMemoryLandlordRooms.length > 0) {
+    if (inMemoryLandlordRooms !== null) {
         return inMemoryLandlordRooms;
     }
 

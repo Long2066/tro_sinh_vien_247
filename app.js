@@ -1401,13 +1401,15 @@ function initEventListeners() {
     }
 
     // Sự kiện đóng Modal chi tiết phòng
-    document.getElementById('close-detail-modal-btn').addEventListener('click', closeRoomDetailsModal);
-    document.getElementById('close-detail-modal-btn-footer').addEventListener('click', closeRoomDetailsModal);
+    const closeBtn1 = document.getElementById('close-detail-modal-btn');
+    if (closeBtn1) closeBtn1.addEventListener('click', closeRoomDetailsModal);
+    const closeBtn2 = document.getElementById('close-detail-modal-btn-footer');
+    if (closeBtn2) closeBtn2.addEventListener('click', closeRoomDetailsModal);
 
     // Bấm ra ngoài modal để đóng
     window.addEventListener('click', (e) => {
         const modal = document.getElementById('report-modal');
-        const detailModal = document.getElementById('room-details-modal');
+        const detailModal = document.getElementById('room-detail-modal') || document.getElementById('room-details-modal');
         const postModal = document.getElementById('post-room-modal');
         if (e.target === modal) {
             closeReportModal();
@@ -1683,10 +1685,11 @@ function showRoomDetails(room) {
         };
     }
 
-    // Open the modal
-    const modal = document.getElementById('room-details-modal');
+    // Open the modal (hỗ trợ cả ID room-detail-modal và room-details-modal)
+    const modal = document.getElementById('room-detail-modal') || document.getElementById('room-details-modal');
     if (modal) {
         modal.style.display = 'flex';
+        modal.classList.add('active');
         const modalBody = modal.querySelector('.modal-body');
         if (modalBody) {
             modalBody.scrollTop = 0;
@@ -1696,7 +1699,11 @@ function showRoomDetails(room) {
 
 // Đóng modal chi tiết phòng trọ
 function closeRoomDetailsModal() {
-    document.getElementById('room-details-modal').style.display = 'none';
+    const modal = document.getElementById('room-detail-modal') || document.getElementById('room-details-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+    }
 }
 
 // ==========================================
